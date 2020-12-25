@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" aria-labelledby="title"
+aria-describedby="desc" role="img" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <title>Visible</title>
+  <desc>A line styled icon from Orion Icon Library.</desc>
+  <path data-name="layer2"
+  d="M62 36S52 18 32 18 2 36 2 36" fill="none" stroke="#202020" stroke-miterlimit="10"
+  stroke-width="4" stroke-linejoin="round" stroke-linecap="round"></path>
+  <circle data-name="layer1" cx="32" cy="33" r="13" fill="none" stroke="#202020"
+  stroke-miterlimit="10" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"></circle>
+  <path data-name="layer1" d="M36.2 35.8a5.2 5.2 0 0 0-4.5-7.8"
+  fill="none" stroke="#202020" stroke-miterlimit="10" stroke-width="4" stroke-linejoin="round"
+  stroke-linecap="round"></path>
+</svg>

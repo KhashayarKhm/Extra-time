@@ -1,0 +1,33 @@
+/* styles for 'moveSection' function */
+.moveSection-prevElement {
+  position: absolute !important;
+  -webkit-transform: translate(0, -100vh) !important;
+  transform: translate(0, -100vh) !important;
+}
+
+.moveSection-prevElement-left {
+  position: absolute !important;
+  -webkit-transform: translate(-100vw, -100vh) !important;
+  transform: translate(-100vw, -100vh) !important;
+}
+
+.moveSection-prevElement-right {
+  position: absolute !important;
+  -webkit-transform: translate(100vw, -100vh) !important;
+  transform: translate(100vw, -100vh) !important;
+}
+
+.moveSection-nextElement {
+  -webkit-transform: translateX(0) !important;
+  transform: translateX(0) !important;
+}
+
+.moveSection-nextElement-left {
+  -webkit-transform: translateX(-100vw) !important;
+  transform: translateX(-100vw) !important;
+}
+
+.moveSection-nextElement-right {
+  -webkit-transform: translateX(100vw) !important;
+  transform: translateX(100vw) !important;
+}
