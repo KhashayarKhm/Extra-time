@@ -17,7 +17,10 @@ bjash byd ybar %7(roz baqi az hfte) krd ybar /7(hfte haii k gzsht) */
 /* BUG: function _caller fqt esm mide o khod function ro nmide va mish ba ye function dige ba hmon esm drst krd o rid bhsh */
 /* IDEA: mit bjay inke hme edit haro bhshon object jdid
  return knim mish property hay object ro getter gzsht k hrdfe jdid trin ro update mikne */
-// FIXME: onaii k object ro freeze miknm bzrm toy finally
+// FIXME: onaii k object ro freeze miknm bzrm toy finally : taze mikhastm bgm asln niazi ni k hmja try...catch zd : jryan finally ro byd az avl vas hme class ha gzasht
+/* REVIEW: functionaii k comment gzashtm
+          1. Day => constructor, addTask
+*/
 function _caller(depth = 0) {
   depth += 2;
   const stackTrace = (new Error()).stack; // Only tested in latest FF and Chrome
@@ -317,126 +320,185 @@ function getOS(objectStores) {
 
 class Day {
   constructor(date = '') {
-    try {
-      // Handeling the date argument
-      if (typeof date !== 'string') {
-        throw new TypeError(`${date} is invalid argument`);
-      } else if (date) {
-        if (!new Date(date).getTime()) {
-          throw new RangeError('Invalid date');
-        } else {
-          const _date = new Date(date).getTime();
-          const now = new Date(_Date('en-US')).getTime();
-          if (_date < now) {
-            throw new RangeError('This date is over');
-          }
-        }
-      }
-      // Set property and add it to database automaticly or restore it
-      const dayObjectHandeling = new Promise((resolve, reject) => {
-        const request = window.indexedDB.open('todo_db', 1);
-        request.onsuccess = event => {
-          resolve(event.target.result);
-        };
-      });
-      dayObjectHandeling.then(database => {
-        const transaction = database.transaction(['days_ahead'], 'readwrite');
-        const objectStore = transaction.objectStore('days_ahead');
-        date = date ? date.replace(/[-]/g, '/') : _Date('en-US');
-        objectStore.openCursor(date).onsuccess = event => {
-          const cursor = event.target.result;
-          if (cursor) {
-            // Restore the date
-            const targetDate = cursor.value;
-            this.date = date;
-            this.tasks = targetDate.tasks;
-            this.doneTasks = targetDate.doneTasks;
-            this.weekday = targetDate.weekday;
-            this.skippedTasks = targetDate.skippedTasks;
-          } else {
-            // Create a new one and add it to database
-            this.date = date;
-            this.tasks = [];
-            this.doneTasks = 0;
-            this.skippedTasks = 0;
-            const weekday = new Date(date).getDay();
-            this.weekday = weekday;
-            const newDay = {
-              date: this.date,
-              tasks: this.tasks,
-              doneTasks: this.doneTasks,
-              weekday: this.weekday,
-              skippedTasks: this.skippedTasks,
-            };
-            const request = objectStore.add(newDay);
-            // FIXME: age in EventListener ha ntone jay kol function return kne ba async await zd
-            transaction.oncomplete = () => {
-              // TODO: ui function and log
-            };
-          }
-          Object.preventExtensions(this);
-          Object.freeze(this);
-          Object.seal(this);
-          Object.preventExtensions(Day.prototype);
-          Object.freeze(Day.prototype);
-          Object.seal(Day.prototype);
-        };
-      }).catch(exception => {
-        /* WARNING: bbinm k inja age return bznm koln qat mikne ya n
-        shyd asn age in catch ro brdrm bre toy catch asli */
-        throw exception;
-      });
-    } catch (exception) {
-      throw exception;
-      // TODO: age brname crash krd ui function ro call kne
-    }
-  }
-
-  set addTask(taskId) {
-    try {
-      // Handeling argument and date
-      if (typeof taskId !== 'string') {
-        throw new TypeError('The taskId value is invalid');
+    // Handeling the date argument
+    if (typeof date !== 'string') {
+      throw new TypeError(`${date} is invalid argument`);
+    } else if (date) {
+      if (!new Date(date).getTime()) {
+        throw new RangeError('Invalid date');
       } else {
-        const targetDate = new Date(this.date).getTime();
+        const _date = new Date(date).getTime();
         const now = new Date(_Date('en-US')).getTime();
-        if (targetDate < now) {
+        if (_date < now) {
           throw new RangeError('This date is over');
         }
       }
-      // Main code
-      new Promise((resolve, reject) => {
-        const request = window.indexedDB.open('todo_db', 1);
-        request.onsuccess = event => {
-          resolve(event.target.result);
-        };
-      }).then(database => {
-        const transaction = database.transaction(['days_ahead'], 'readwrite');
-        const todoItemsOS = transaction.objectStore('days_ahead');
-        const cursorReq = todoItemsOS.openCursor(this.date);
+    }
+    // Set property and add it to database or restore it automaticly
+    date = date ? date.replace(/[-]/g, '/') : _Date('en-US');
+    const weekday = new Date(date).getDay();
+    const dayObjectProcess = new Promise((resolve, reject) => {
+      const daysAheadOS = getOS(['days_ahead']);
+      // wait till getOS response
+      daysAheadOS.then(objectStore => {
+        return Promise.resolve(objectStore);
+      });
+      resolve(daysAheadOS);
+    }).then(daysAheadOS => {
+      daysAheadOS = daysAheadOS[0];
+      const cursorProcess = new Promise((resolve, reject) => {
+        const cursorReq = daysAheadOS.openCursor(date);
+        // wait till cursor request success
         cursorReq.onsuccess = event => {
           const cursor = event.target.result;
-          if (cursor) {
-            const targetDay = cursor.value;
-            targetDay.tasks.push(taskId);
-            const updateReq = cursor.update(targetDay);
-            updateReq.onsuccess = () => {
-              const _targetDay = new Date(targetDay.date).getTime();
-              const now = new Date(_Date('en-US')).getTime();
-              if (_targetDay === now) {
-                // TODO: call ui function for refresh the app
-              }
-            };
-          } else {
-            reject(new ReferenceError('This date does not exist in objectStore'));
-          }
+          resolve(cursor);
         };
-      }).catch(exception => {
-        throw exception;
+      }).then(cursor => {
+        if (cursor) {
+          // Restore the date
+          const targetDate = cursor.value;
+          console.log(targetDate);
+          this.date = date;
+          this.tasks = targetDate.tasks;
+          this.doneTasks = targetDate.doneTasks;
+          this.weekday = targetDate.weekday;
+          this.skippedTasks = targetDate.skippedTasks;
+          Object.freeze(this);
+          Object.seal(this);
+          Object.preventExtensions(this);
+          return Promise.resolve(this);
+        } else {
+          // Create a new one and add it to database
+          this.date = date;
+          this.tasks = [];
+          this.doneTasks = 0;
+          this.skippedTasks = 0;
+          this.weekday = weekday;
+          const newDay = {
+            date: this.date,
+            tasks: this.tasks,
+            doneTasks: this.doneTasks,
+            weekday: this.weekday,
+            skippedTasks: this.skippedTasks,
+          };
+          const addProcess = new Promise((resolve, reject) => {
+            const addRequest = daysAheadOS.add(newDay);
+            // wait till add request success
+            addRequest.onsuccess = event => {
+              resolve();
+            }
+          }).then(() => {
+            Object.freeze(this);
+            Object.seal(this);
+            Object.preventExtensions(this);
+            return Promise.resolve(this);
+          });
+
+          return Promise.resolve(addProcess);
+        }
       });
-    } catch (exception) {
-      throw exception;
+
+      return Promise.resolve(cursorProcess);
+    });
+
+    Object.freeze(Day.prototype);
+    Object.seal(Day.prototype);
+    Object.preventExtensions(Day.prototype);
+
+    return dayObjectProcess;
+  }
+
+  addTask(taskId) {
+    // NOTE: test kaml nshde
+    // Handeling argument and date
+    if (typeof taskId !== 'string') {
+      throw new TypeError('The taskId value is invalid');
+    } else {
+      const targetDate = new Date(this.date).getTime();
+      const now = new Date(_Date('en-US')).getTime();
+      if (targetDate < now) {
+        throw new RangeError('This date is over');
+      }
     }
+    // Main code
+    const addTaskProcess = new Promise((resolve, reject) => {
+      const objectStores = getOS(['todo_items', 'days_ahead']);
+      // wait till object store request success
+      objectStores.then(response => {
+        Promise.resolve(response);
+      });
+      resolve(objectStores);
+    }).then(objectStores => {
+      // Verify the task id
+      const todoItemsOS = objectStores[0];
+      const verifyAndAddProcess = new Promise((resolve, reject) => {
+        console.log('b1.1');
+        const cursorReq = todoItemsOS.openCursor(taskId);
+        cursorReq.onsuccess = event => {
+          console.log('b1.2');
+          resolve(event.target.result);
+        };
+      }).then(cursor => {
+        console.log('b2');
+        if (cursor) {
+          const daysAheadOS = objectStores[1];
+          Promise.resolve(daysAheadOS);
+        } else {
+          return Promise.reject(new RangeError('The specified task id is invalid'));
+        }
+      }).then(daysAheadOS => {
+        console.log('b3.1');
+        console.log(daysAheadOS);
+        // const daysAheadOS = objectStores[1];
+        const cursorProcess = new Promise((resolve, reject) => {
+          console.log('b3.2');
+          const cursorReq = daysAheadOS.openCursor(this.date);
+          // wait till cursor request success
+          cursorReq.onsuccess = event => {
+            console.log('b3.3');
+            const cursor = event.target.result;
+            resolve(cursor);
+          };
+        }).then(cursor => {
+          console.log('b3.4');
+          if (cursor) {
+            const targetDate = cursor.value;
+            targetDate.tasks.push(taskId);
+            const updateReq = new Promise((resolve, reject) => {
+              console.log('b3.5');
+              const request = cursor.update(targetDate);
+              // wait till update request success
+              request.onsuccess = () => {
+                console.log('b3.6');
+                resolve();
+              }
+            }).then(() => {
+              console.log('b3.7');
+              const dateTime = new Date(targetDate.date).getTime();
+              const now = new Date(_Date('en-US')).getTime();
+              if (dateTime === now) {
+                return Promise.resolve(true);
+              }
+              return Promise.resolve(false);
+            }).catch(exception => {
+              // COMBAK: inja byd y code bazgashti bznm
+              console.error(exception);
+              console.info('catch execute: byd catch ro drst knm k dob request bfrste');
+            });
+
+            return Promise.resolve(updateReq);
+          } else {
+            return Promise.reject(new DOMException('The specified key or key range is invalid', 'DataError'));
+          }
+        });
+
+        return Promise.resolve(cursorProcess);
+      });
+
+      return Promise.resolve(verifyAndAddProcess);
+    })
+
+    return addTaskProcess;
   }
 
   async skipTask(taskId) {
