@@ -17,7 +17,15 @@ bjash byd ybar %7(roz baqi az hfte) krd ybar /7(hfte haii k gzsht) */
 /* BUG: function _caller fqt esm mide o khod function ro nmide va mish ba ye function dige ba hmon esm drst krd o rid bhsh */
 /* IDEA: mit bjay inke hme edit haro bhshon object jdid
  return knim mish property hay object ro getter gzsht k hrdfe jdid trin ro update mikne */
-// FIXME: onaii k object ro freeze miknm bzrm toy finally : taze mikhastm bgm asln niazi ni k hmja try...catch zd : jryan finally ro byd az avl vas hme class ha gzasht
+/* FIXME: onaii k object ro freeze miknm bzrm toy finally : taze mikhastm bgm asln niazi ni k hmja try...catch zd
+: jryan finally ro byd az avl vas hme class ha gzasht
+  Object.preventExtensions(ToDoItem.prototype);
+  Object.freeze(ToDoItem.prototype);
+  Object.seal(ToDoItem.prototype);
+  Object.preventExtensions(Day.prototype);
+  Object.freeze(Day.prototype);
+  Object.seal(Day.prototype);
+ */
 /* REVIEW: functionaii k comment gzashtm
           1. Day => constructor, addTask
 */
@@ -139,97 +147,93 @@ function _Date(local, splicer = '/') {
 }
 
 function calculateFewDaysBeforeOrAfter(numberOfDays, direction, local = 'en-US', date = '', splicer = '/') {
-  try {
-    // Handeling the arguments
-    switch (true) {
-      case typeof numberOfDays !== 'number':
-        throw new TypeError('\'numberOfDays\' argument has invalid value');
-      case typeof direction !== 'string':
-        throw new TypeError('\'direction\' argument has invalid value');
-      case typeof local !== 'string':
-        throw new TypeError('\'local\' argument has invalid value');
-      case typeof date !== 'string':
-        throw new TypeError('\'date\' argument has invalid value');
-      case typeof splicer !== 'string':
-        throw new TypeError('\'splicer\' argument has invalid value');
-      case numberOfDays < 0 || !Number.isInteger(numberOfDays):
-        throw new RangeError('\'numberOfDays\' argument has wrong value');
-      case direction !== 'after' && direction !== 'before':
-        throw new RangeError('\'direction\' argument has wrong value');
-      case local !== 'en-US' && local !== 'fa-IR':
-        throw new RangeError('\'local\' argument has wrong value');
-      case !(new Date(date)) && date !== '':
-        // Execute when the date is not empty but it is not valid
-        throw new RangeError('Invalid date');
-      case splicer !== '/' && splicer !== '-':
-        throw new RangeError('\'splicer\' argument has wrong value');
-      default:
-        date = date ? date.replace('-', '/') : _Date('en-US');
-    }
-    const millisecInDay = 86400000;
-    const interval = numberOfDays * millisecInDay;
-    const originDateInMillisec = new Date(date).getTime();
-    const targetDayInMillisec = direction === 'after' ? originDateInMillisec + interval
-    : Math.abs(originDateInMillisec + interval);
-    let targetDate = new Date(targetDayInMillisec).toDateString();
-    targetDate = targetDate.slice(5, 16);
-    switch (true) {
-      case targetDate.includes('Jan'):
-        targetDate = targetDate.replace('Jan', '01');
-        break;
-      case targetDate.includes('Feb'):
-        targetDate = targetDate.replace('Feb', '02');
-        break;
-      case targetDate.includes('Mar'):
-        targetDate = targetDate.replace('Mar', '03');
-        break;
-      case targetDate.includes('Apr'):
-        targetDate = targetDate.replace('Apr', '04');
-        break;
-      case targetDate.includes('May'):
-        targetDate = targetDate.replace('May', '05');
-        break;
-      case targetDate.includes('Jun'):
-        targetDate = targetDate.replace('Jun', '06');
-        break;
-      case targetDate.includes('Jul'):
-        targetDate = targetDate.replace('Jul', '07');
-        break;
-      case targetDate.includes('Aug'):
-        targetDate = targetDate.replace('Aug', '08');
-        break;
-      case targetDate.includes('Sep'):
-        targetDate = targetDate.replace('Sep', '09');
-        break;
-      case targetDate.includes('Oct'):
-        targetDate = targetDate.replace('Oct', '10');
-        break;
-      case targetDate.includes('Nov'):
-        targetDate = targetDate.replace('Nov', '11');
-        break;
-      case targetDate.includes('Dec'):
-        targetDate = targetDate.replace('Dec', '12');
-        break;
-      default:
-        throw new RangeError('Undefined month');
-    }
-    targetDate = targetDate.split(' ').reverse();
-    switch (local) {
-      case 'fa-IR':
-        targetDate = new Date(Date.UTC(targetDate[0], targetDate[1] - 1, targetDate[2]));
-        targetDate = targetDate.toLocaleDateString('fa-IR');
-        targetDate = targetDate.replace(/[/]/g, splicer);
-        break;
-      case 'en-US':
-        targetDate = targetDate.join(splicer);
-        break;
-      default:
-        throw new RangeError('\'local\' argument has wrong value');
-    }
-    return targetDate;
-  } catch (exception) {
-    throw exception;
+  // Handeling the arguments
+  switch (true) {
+    case typeof numberOfDays !== 'number':
+      throw new TypeError('\'numberOfDays\' argument has invalid value');
+    case typeof direction !== 'string':
+      throw new TypeError('\'direction\' argument has invalid value');
+    case typeof local !== 'string':
+      throw new TypeError('\'local\' argument has invalid value');
+    case typeof date !== 'string':
+      throw new TypeError('\'date\' argument has invalid value');
+    case typeof splicer !== 'string':
+      throw new TypeError('\'splicer\' argument has invalid value');
+    case numberOfDays < 0 || !Number.isInteger(numberOfDays):
+      throw new RangeError('\'numberOfDays\' argument has wrong value');
+    case direction !== 'after' && direction !== 'before':
+      throw new RangeError('\'direction\' argument has wrong value');
+    case local !== 'en-US' && local !== 'fa-IR':
+      throw new RangeError('\'local\' argument has wrong value');
+    case !(new Date(date)) && date !== '':
+      // Execute when the date is not empty but it is not valid
+      throw new RangeError('Invalid date');
+    case splicer !== '/' && splicer !== '-':
+      throw new RangeError('\'splicer\' argument has wrong value');
+    default:
+      date = date ? date.replace('-', '/') : _Date('en-US');
   }
+  const millisecInDay = 86400000;
+  const interval = numberOfDays * millisecInDay;
+  const originDateInMillisec = new Date(date).getTime();
+  const targetDayInMillisec = direction === 'after' ? originDateInMillisec + interval
+  : Math.abs(originDateInMillisec + interval);
+  let targetDate = new Date(targetDayInMillisec).toDateString();
+  targetDate = targetDate.slice(4, 16);
+  switch (true) {
+    case targetDate.includes('Jan'):
+      targetDate = targetDate.replace('Jan', '01');
+      break;
+    case targetDate.includes('Feb'):
+      targetDate = targetDate.replace('Feb', '02');
+      break;
+    case targetDate.includes('Mar'):
+      targetDate = targetDate.replace('Mar', '03');
+      break;
+    case targetDate.includes('Apr'):
+      targetDate = targetDate.replace('Apr', '04');
+      break;
+    case targetDate.includes('May'):
+      targetDate = targetDate.replace('May', '05');
+      break;
+    case targetDate.includes('Jun'):
+      targetDate = targetDate.replace('Jun', '06');
+      break;
+    case targetDate.includes('Jul'):
+      targetDate = targetDate.replace('Jul', '07');
+      break;
+    case targetDate.includes('Aug'):
+      targetDate = targetDate.replace('Aug', '08');
+      break;
+    case targetDate.includes('Sep'):
+      targetDate = targetDate.replace('Sep', '09');
+      break;
+    case targetDate.includes('Oct'):
+      targetDate = targetDate.replace('Oct', '10');
+      break;
+    case targetDate.includes('Nov'):
+      targetDate = targetDate.replace('Nov', '11');
+      break;
+    case targetDate.includes('Dec'):
+      targetDate = targetDate.replace('Dec', '12');
+      break;
+    default:
+      throw new RangeError('Undefined month');
+  }
+  targetDate = targetDate.split(' ').reverse();
+  switch (local) {
+    case 'fa-IR':
+      targetDate = new Date(Date.UTC(targetDate[0], targetDate[1] - 1, targetDate[2]));
+      targetDate = targetDate.toLocaleDateString('fa-IR');
+      targetDate = targetDate.replace(/[/]/g, splicer);
+      break;
+    case 'en-US':
+      targetDate = targetDate[0] + splicer + targetDate[2] + splicer + targetDate[1];
+      break;
+    default:
+      throw new RangeError('\'local\' argument has wrong value');
+  }
+  return targetDate;
 }
 
 function getOS(objectStores) {
@@ -357,7 +361,6 @@ class Day {
         if (cursor) {
           // Restore the date
           const targetDate = cursor.value;
-          console.log(targetDate);
           this.date = date;
           this.tasks = targetDate.tasks;
           this.doneTasks = targetDate.doneTasks;
@@ -400,10 +403,6 @@ class Day {
 
       return Promise.resolve(cursorProcess);
     });
-
-    Object.freeze(Day.prototype);
-    Object.seal(Day.prototype);
-    Object.preventExtensions(Day.prototype);
 
     return dayObjectProcess;
   }
@@ -699,172 +698,316 @@ class ToDoItem {
   /* WARNING: ToDoItem vqti vas on roz tmom shde dige edit nshe
   dob bshinm function edit ro check khonm chon vqti DayObject.doneTask() rah miofte yki az scheduledDays km mikne o ok mish */
   constructor(subject, timer, scheduledDays = 0, pattern = [0, 1, 2, 3, 4, 5, 6], pin = false, description = '', id = '') {
-    try {
-      switch (true) {
-        case typeof id !== 'string':
-          throw new TypeError('\"id\" is invalid argument');
-        case typeof subject !== 'string':
-          throw new TypeError('\"subject\" is invalid argument');
-        case typeof scheduledDays !== 'number':
-          throw new TypeError('\"scheduledDays\" is invalid argument');
-        case typeof timer !== 'number':
-          throw new TypeError('\"timer\" is invalid argument');
-        case !pattern instanceof Array:
-          throw new TypeError('\"pattern\" is invalid argument');
-        case typeof pin !== 'boolean':
-          throw ['type', pin];
-        case typeof description !== 'string':
-          throw new TypeError('\"description\" is invalid argument');
-        case id && _caller() !== 'restore':
-          throw new Error('Permission denied to access property \"id\"');
-        case scheduledDays < 0 && !Number.isInteger(scheduledDays):
-          throw new RangeError('\'scheduledDays\' count must be non-negative');
-        case timer < 0 && !Number.isInteger(scheduledDays):
-          throw new RangeError('\'timer\' count must be non-negative');
-        default:
-          if (pattern.length < 7 || pattern.length !== 0) {
-            const validValue = pattern.every(item => {
-              return Number.isInteger(item) && item <= 6 && item >= 0;
-            });
-            if (validValue) {
-              pattern = pattern.sort();
-              pattern = removeDuplicateValue(pattern);
-            } else {
-              throw new TypeError('Invalid array value');
-            }
+    switch (true) {
+      case typeof id !== 'string':
+        throw new TypeError('\"id\" is invalid argument');
+      case typeof subject !== 'string':
+        throw new TypeError('\"subject\" is invalid argument');
+      case typeof scheduledDays !== 'number':
+        throw new TypeError('\"scheduledDays\" is invalid argument');
+      case typeof timer !== 'number':
+        throw new TypeError('\"timer\" is invalid argument');
+      case !pattern instanceof Array:
+        throw new TypeError('\"pattern\" is invalid argument');
+      case typeof pin !== 'boolean':
+        throw ['type', pin];
+      case typeof description !== 'string':
+        throw new TypeError('\"description\" is invalid argument');
+      case id && _caller() !== 'restore':
+        throw new Error('Permission denied to access property \"id\"');
+      case scheduledDays < 0 && !Number.isInteger(scheduledDays):
+        throw new RangeError('\'scheduledDays\' count must be non-negative');
+      case timer < 0 && !Number.isInteger(scheduledDays):
+        throw new RangeError('\'timer\' count must be non-negative');
+      default:
+        if (pattern.length < 7 || pattern.length !== 0) {
+          const validValue = pattern.every(item => {
+            return Number.isInteger(item) && item <= 6 && item >= 0;
+          });
+          if (validValue) {
+            pattern = pattern.sort();
+            pattern = removeDuplicateValue(pattern);
           } else {
-            throw new RangeError('Invalid array length');
+            throw new TypeError('Invalid array value');
           }
-      }
+        } else {
+          throw new RangeError('Invalid array length');
+        }
+    }
 
-      this.subject = subject;
-      this.scheduledDays = scheduledDays;
-      // The timer is to minute
-      this.timer = timer;
-      this.pin = pin;
-      this.description = description;
-      this.remainedDays = scheduledDays;
-      this.pattern = pattern;
-      /* FIXME: inja ro bdn byd az package uuid estfade krd
-      2- momkne k id tkrari bash pas byd ye check knm
-      3- momkne khod uuid moshkl pyda kne pas byd toy try...catch bash */
-      if (id) {
-        this.id = id;
-      } else {
-        function todoItemAddProcess(newTask) {
-          const process = getOS(['todo_items']);
-          process.then(objectStores => {
-            throw new Error('test'); //  //  //
-            const todoItemsOS = objectStores[0];
-            const addRequest = todoItemsOS.add(newTask);
-            addRequest.onsuccess = () => {
-              Promise.resolve();
+    this.subject = subject;
+    this.scheduledDays = scheduledDays;
+    // The timer is to minute
+    this.timer = timer;
+    this.pin = pin;
+    this.description = description;
+    this.remainedDays = scheduledDays;
+    this.pattern = pattern;
+    /* FIXME: inja ro bdn byd az package uuid estfade krd
+    2- momkne k id tkrari bash pas byd ye check knm
+    3- momkne khod uuid moshkl pyda kne pas byd toy try...catch bash */
+    if (id) {
+      console.info('restore');
+      this.id = id;
+    } else {
+      /* REVIEW: in vas in inja has chon mish chnd bar sdash krd age error dd
+      joda az in in ravesh code fqt dash id ro b tarikh emroz ezafe mikrd
+      alan hm mn chnd bari k test krdm asln kar nmikrd */
+      function addTaskToDate(date, taskId) {
+        const process = new Promise((resolve, reject) => {
+          const objectStoreReq = getOS(['days_ahead']);
+          objectStoreReq.then(response => {
+            return Promise.resolve(response);
+          });
+          resolve(objectStoreReq);
+        }).then(daysAheadOS => {
+          daysAheadOS = daysAheadOS[0];
+          const cursorProcess = new Promise((resolve, reject) => {
+            const cursorReq = daysAheadOS.openCursor(date);
+            cursorReq.onsuccess = event => {
+              const cursor = event.target.result;
+              resolve(cursor);
             };
-          }).catch(exception => {
-            return Promise.reject(exception);
-          });
-        }
-
-        function daysAheadAddProcess() {
-          const process2 = getOS(['days_ahead']);
-          process2.then(objectStores => {
-            const daysAheadOS = objectStores[0];
-            let weekdaysToken;
-            length = this.pattern.length;
-            let j = 0;
-            do {
-              if (j >= length) {
-                break;
-              }
-              weekdaysToken = this.scheduledDays / (length - j);
-              j++;
-            } while (!Number.isInteger(weekdaysToken));
-            // WARNING: inja ye check knm age roy index miad pas fk knm byd yki dige hm km krd
-            // TODO: ino bdn test knm k ba ye -1 ok mish ya n
-            let exceptionToken = length - j - 1;
-            if (weekdaysToken === 0) {
-              // Just add it for today
-              const cursorReq = daysAheadOS.openCursor(_Date('en-US'));
-              cursorReq.onsuccess = event => {
-                const cursor = event.target.result;
-                if (cursor) {
-                  const today = cursor.value;
-                  today.tasks.push(this.id);
-                  const updateReq = cursor.update(today);
-                  updateReq.onsuccess = () => {
-                    // resolve
-                  };
-                } else {
-                  // Today doesn't exist in days_ahead object store
-                  const today = new Day();
-                  const _cursorReq = daysAheadOS.openCursor(today.date);
-                  _cursorReq.onsuccess = event => {
-                    const _cursor = event.target.result;
-                    if (_cursor) {
-                      const _today = _cursor.value;
-                      _today.tasks.push(this.id);
-                      const updateReq = _cursor.update(_today);
-                      updateReq.onsuccess = () => {
-                        // resolve
-                      };
-                    }
-                  };
-                }
-              };
-            } else {
-              for (j = 0; j < length; j++) {
-                const cursorReq = daysAheadOS.openCursor(this.pattern[j]);
-                let et = exceptionToken > 0 ? 1 : 0;
-                cursorReq.onsuccess = event => {
-                  let wt = weekdaysToken;
-                  const cursor = event.target.result;
-                  if (cursor && (wt + et)) {
-                    const targetDay = cursor.value;
-                    targetDay.tasks.push(this.id);
-                    const updateReq = cursor.update(targetDay);
-                    updateReq.onsuccess = () => {
-                      wt--;
-                      cursor.continue();
-                    };
-                    exceptionToken--;
-                  }
+          }).then(cursor => {
+            if (cursor) {
+              const targetDate = cursor.value;
+              const updateProcess = new Promise((resolve, reject) => {
+                targetDate.tasks.push(taskId);
+                const updateReq = cursor.update(targetDate);
+                updateReq.onsuccess = () => {
+                  return resolve();
                 };
-              }
+              })
+              return Promise.resolve(updateProcess);
+            } else {
+              return Promise.reject('!!');
             }
-
-            // process1.resolve();
-          }).catch(exception => {
-            console.log(2);
-            Promise.reject(exception);
           });
-        }
+          return Promise.resolve(cursorProcess);
+        });
+
+        return process;
+      }
+      const initTodoItem = new Promise((resolve, reject) => {
+        // console.log('initTodoItem-p1');
+        const objectStoresReq = getOS(['todo_items', 'days_ahead']);
+        objectStoresReq.then(response => {
+          // console.log('initTodoItem-p2');
+          return Promise.resolve(response);
+        });
+        resolve(objectStoresReq);
+      }).then(objectStores => {
+        // console.log('initTodoItem-p3');
+        // Initialize the todo item id
         const uniqueId = (Math.random() * 100).toFixed();
         this.id = uniqueId;
-        const newTask = {
-          id: this.id,
-          subject: this.subject,
-          timer: this.timer,
-          scheduledDays: this.scheduledDays,
-          pin: this.pin,
-          description: this.description,
-          pattern: this.pattern,
-        };
-
-        // Add the new task to todo_items object store
-        // await
-        // Add the new task to days_ahead object store in target dates
-        // await
-      }
-    } catch (exception) {
-      console.log(11);
-      throw exception;
-    } finally {
-      Object.preventExtensions(this);
-      Object.freeze(this);
-      Object.seal(this);
-      Object.preventExtensions(ToDoItem.prototype);
-      Object.freeze(ToDoItem.prototype);
-      Object.seal(ToDoItem.prototype);
+        const todoItemsOS = objectStores[0];
+        const addProcess = new Promise((resolve, reject) => {
+          // console.log('addProcess-p1');
+          // Create a clone of this todo item
+          const newTask = {
+            id: this.id,
+            subject: this.subject,
+            timer: this.timer,
+            scheduledDays: this.scheduledDays,
+            pin: this.pin,
+            description: this.description,
+            pattern: this.pattern,
+          };
+          // Add todo item to todo_items object store
+          // "TIOS" stands for "Todo Item Object Store"
+          const addToTIOS = todoItemsOS.add(this);
+          addToTIOS.onsuccess = () => {
+            // console.log('addProcess-p2');
+            const daysAheadOS = objectStores[1];
+            resolve(daysAheadOS);
+          }
+        }).then(daysAheadOS => {
+          // console.log('addProcess-p3');
+          if (this.scheduledDays === 0) {
+            console.info('Just for today.')
+            // Just add it for today
+            const cursorProcess = new Promise((resolve, reject) => {
+              // console.log('cursorProcess-p1');
+              const today = _Date('en-US');
+              const cursorReq = daysAheadOS.openCursor(today);
+              cursorReq.onsuccess = event => {
+                // console.log('cursorProcess-p2');
+                const cursor = event.target.result;
+                resolve(cursor);
+              };
+            }).then(cursor => {
+              // console.log('cursorProcess-p3');
+              /* QUESTION: fk knm dige lzm ni k cursor ro check knm
+              chon dige today ro avl kar restore mikne ya jdid misaze */
+              const today = cursor.value;
+              // console.log(today);
+              today.tasks.push(this.id);
+              const updateProcess = new Promise((resolve, reject) => {
+                // console.log('updateProcess-p1');
+                const updateReq = cursor.update(today);
+                updateReq.onsuccess = () => {
+                  // console.log('updateProcess-p2');
+                  resolve();
+                }
+              }).then(() => {
+                // console.log('updateProcess-p3');
+                Object.seal(this);
+                Object.preventExtensions(this);
+                /* WARNING: inja age freeze knm dige nmish edit zd
+                age besh ye object update shde frstad toy edit() khobe */
+                Object.freeze(this);
+                return Promise.resolve(this);
+              });
+              return Promise.resolve(updateProcess);
+            });
+            console.warn('return cursorProcess (JFT)');
+            return Promise.resolve(cursorProcess);
+          } else {
+            console.info('for many days');
+            // Add task to target days
+            const length = this.pattern.length;
+            // CHANGED: inja ro jay on do...while gzashtm
+            // WARNING: inja ye check knm age roy index miad pas fk knm byd yki dige hm km krd
+            let weekdaysToken = parseInt(this.scheduledDays / length);
+            let singleDaysToken = this.scheduledDays % length;
+            const updateRequests = [];
+            /* Modify the this.pattern and sort it to match with today weekday cause:
+            if we don't do this the difference between first target weekday and today weekday is be negative
+            and can't find it in object store */
+            /* IDEA: fk knm age trf bkhad az chnd roz jlo tr barname brize byd jay 'new Date()'
+            targetDate gzasht */
+            const originWeekday = new Date().getDay();
+            const patternPart1 = this.pattern.filter(element => element >= originWeekday);
+            const patternPart2 = this.pattern.filter(element => element < originWeekday);
+            const pattern = [...patternPart1, ...patternPart2];
+            let i, targetWeekday;
+            for (targetWeekday of pattern) {
+              let wt = weekdaysToken;
+              // "sdt" stands for "Single Days Token" (for pointing)
+              let sdt = singleDaysToken > 0 ? 1 : 0;
+              // IDEA: hmon chizi k toy IDEA qbli gftm inja hm byd bash
+              do {
+                const color = `rgb(${(Math.random() * 255) + 0}, ${(Math.random() * 255) + 0}, ${(Math.random() * 255) + 0})`;
+                const daysInterval = (wt ? (7 * (wt + sdt)) : 0) + Math.abs(originWeekday - targetWeekday);
+                const calculatedDate = calculateFewDaysBeforeOrAfter(daysInterval, 'after', 'en-US');
+                const cursorProcess = new Promise((resolve, reject) => {
+                  // console.log(`cursorProcess-p1 %c (${calculatedDate})`, `color: ${color};`);
+                  const cursorReq = daysAheadOS.openCursor(calculatedDate);
+                  cursorReq.onsuccess = event => {
+                    // console.log(`cursorProcess-p2 %c (${calculatedDate})`, `color: ${color};`);
+                    const cursor = event.target.result;
+                    resolve(cursor);
+                  }
+                }).then(cursor => {
+                  // console.log(`cursorProcess-p3 %c (${calculatedDate})`, `color: ${color};`);
+                  // let wt = weekdaysToken;
+                  if (sdt + wt) {
+                    if (cursor) {
+                      const targetDate = cursor.value;
+                      const updateProcess = new Promise((resolve, reject) => {
+                        // console.log(`updateProcess-p1 %c (${calculatedDate})`, `color: ${color};`);
+                        targetDate.tasks.push(this.id);
+                        console.log(`%c ${calculatedDate}`, `color: ${color};`);
+                        console.log(targetDate);
+                        console.log(cursor);
+                        const updateReq = cursor.update(targetDate);
+                        updateReq.onsuccess = () => {
+                          // console.log(`updateProcess-p2 %c (${calculatedDate})`, `color: ${color};`);
+                          return resolve(this);
+                        };
+                      });
+                      console.warn('return updateProcess (way-1)');
+                      return Promise.resolve(updateProcess);
+                    } else {
+                      // The target date does not exist, so we create and add the todo to tasks property
+                      const planBProcess = new Promise((resolve, reject) => {
+                        // console.log(`planBProcess-p1 %c (${calculatedDate})`, `color: ${color};`);
+                        const objectStoreReq = getOS(['days_ahead']);
+                        objectStoreReq.then(response => {
+                          return Promise.resolve(response);
+                        });
+                        resolve(objectStoreReq);
+                      }).then(_daysAheadOS => {
+                        const absenceDate = new Day(calculatedDate);
+                        _daysAheadOS = _daysAheadOS[0];
+                        // console.log(`planBProcess-p2 %c (${calculatedDate})`, `color: ${color};`);
+                        const _cursorProcess = new Promise((resolve, reject) => {
+                          // console.log(`_cursorProcess-p1 %c (${calculatedDate})`, `color: ${color};`);
+                          const _cursorReq = _daysAheadOS.openCursor(calculatedDate);
+                          _cursorReq.onsuccess = event => {
+                            // console.log(`_cursorProcess-p2 %c (${calculatedDate})`, `color: ${color};`);
+                            const _cursor = event.target.result;
+                            resolve(_cursor);
+                          };
+                        }).then(_cursor => {
+                          // console.log(`_cursorProcess-p3 %c (${calculatedDate})`, `color: ${color};`);
+                          if (_cursor) {
+                            const _targetDate = _cursor.value;
+                            _targetDate.tasks.push(this.id);
+                            const _updateProcess = new Promise((resolve, reject) => {
+                              // console.log(`_updateProcess-p1 %c (${calculatedDate})`, `color: ${color};`);
+                              console.log(`%c ${calculatedDate}`, `color: ${color};`);
+                              console.log(_targetDate);
+                              console.log(_cursor);
+                              console.log(absenceDate);
+                              const _updateReq = _cursor.update(_targetDate);
+                              _updateReq.onsuccess = () => {
+                                // console.log(`_updateProcess-p2 %c (${calculatedDate})`, `color: ${color};`);
+                                resolve();
+                              };
+                            }).then(() => {
+                              // console.log(`_updateProcess-p3 %c (${calculatedDate})`, `color: ${color};`);
+                              // IDEA: age in log haii k gzashtm fk knm bdone block then hm ok bash
+                              return Promise.resolve(this);
+                            });
+                            return Promise.resolve(_updateProcess);
+                          } else {
+                            // WARNING: nmid age inja ejra besh vas chie; age nshd koln else ro pk knm ya ye payam khob bzrm
+                            return Promise.reject('??');
+                          }
+                        });
+                        return Promise.resolve(_cursorProcess);
+                      });
+                      console.warn('return planBProcess');
+                      return Promise.resolve(planBProcess);
+                    }
+                  }
+                });
+                // console.log(`%c add ${calculatedDate}`, `color: ${color}; font-size: 18px;`);
+                updateRequests.push(cursorProcess);
+                sdt = 0;
+                wt--;
+              } while (wt > 0);
+              singleDaysToken--;
+            }
+            // Check for all the update requests be successful
+            const requests = Promise.all(updateRequests);
+            requests.then(responses => {
+              // console.log('checkReqs-p1');
+              // Promise.resolve();
+              Object.preventExtensions(this);
+              // QUESTION: ToDoItemObject ro freeze knm?
+              Object.freeze(this);
+              Object.seal(this);
+              // No matter that which one return, all of them are the same
+              return Promise.resolve(responses[0]);
+            })/*.then((value) => {
+            })*/;
+            /*const checkRequests = new Promise((resolve, reject) => {
+              resolve(requests);
+            }).then(response => {
+              return response.value;
+            })*/
+            console.warn('return requests');
+            return Promise.resolve(requests);
+          }
+        });
+        console.warn('return addProcess');
+        return Promise.resolve(addProcess);
+      });
+      console.warn('return initTodoItem');
+      return initTodoItem;
     }
   }
 
