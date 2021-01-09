@@ -16,6 +16,7 @@ onaii k ysare mire vas ui function ro EventListener shono avaz knm o bzrm roy tr
   Object.freeze(Day.prototype);
   Object.seal(Day.prototype);
  */
+ // QUESTION: age bjay inke toy promise nahaii bznim "return Promise.resolve(...)" khod natije ro return knim chi mish?
 function _caller(depth = 0) {
   depth += 2;
   const stackTrace = (new Error()).stack; // Only tested in latest FF and Chrome
@@ -247,6 +248,9 @@ function getOS(objectStores) {
       daysAhead.createIndex('doneTasks', 'doneTasks', {
         unique: false
       });
+      daysAhead.createIndex('weekday', 'weekday', {
+        unique: false
+      });
       daysAhead.createIndex('skippedTasks', 'skippedTasks', {
         unique: false
       });
@@ -262,6 +266,9 @@ function getOS(objectStores) {
         unique: false
       });
       todoItems.createIndex('scheduledDays', 'scheduledDays', {
+        unique: false
+      });
+      todoItems.createIndex('pattern', 'pattern', {
         unique: false
       });
       todoItems.createIndex('pin', 'pin', {
@@ -386,117 +393,211 @@ class Day {
     return dayObjectProcess;
   }
 
-  async skipTask(taskId) {
+  skipTask(taskId) {
     // Handeling argument and the date
     if (typeof taskId !== 'string') {
       throw new TypeError('The taskId value is invalid');
     }
     const targetDate = new Date(this.date).getTime();
-    const now = new Date(_Date('en-US')).getTime();
-    if (targetDate < now) {
-      throw new RangeError('This date is over');
+    const today = new Date(_Date('en-US')).getTime();
+    if (!targetDate) {
+      throw new TypeError('Date is invalid');
+    } else if (targetDate !== today) {
+      throw new RangeError('Can not skip the task on this date');
     }
     // Main code
-    const databaseReq = await window.indexedDB.open('todo_db', 1);
-    let database;
-    databaseReq.onsuccess = event => {
-      database = event.target.result;
-    };
-    const todoItemsOS = await database.transaction('todo_items').objectStore('todo_items');
-    const cursorReq = todoItemsOS.openCursor(taskId);
-    cursorReq.onsuccess = event => {
-      const cursor = event.target.result;
-      if (cursor) {
-        const todoItem = cursor.value;
-        let j = 0, weekdaysToken;
-        const length = todoItem.pattern.length;
-        do {
-          if (j >= length) {
-            break;
-          }
-          weekdaysToken = todoItem.scheduledDays / (length - j);
-          j++;
-        } while (!Number.isInteger(weekdaysToken));
-        // WARNING: inja ye check knm age roy index miad pas fk knm byd yki dige hm km krd
-        let exceptionToken = length - j - 1;
-        const daysAheadOS = database.transaction('days_ahead').objectStore('days_ahead');
-        const cursorReq2 = daysAheadOS.index('weekday').openCursor(exceptionToken);
-        cursorReq2.onsuccess = event => {
-          const cursor2 = event.target.result;
-          let et = exceptionToken ? 1 : 0;
-          if (cursor2) {
-            // QUESTION: weekdaysToken niyaze k yki ezafe she ya n?
-            if (!(weekdaysToken + et)) {
-              const targetDay = cursor2.value;
-              targetDay.tasks.push(taskId);
-              cursor2.update(targetDay);
-            } else if (weekdaysToken + et > 0) {
-              weekdaysToken ? weekdaysToken-- : et ? et-- : undefined;
-              cursor2.continue();
-            }
-          }
+    function modifyToday(daysAheadOS, todayDate) {
+      const modifyTodayProcess = new Promise((resolve, reject) => {
+        const modifyCursorReq = daysAheadOS.openCursor(todayDate);
+        modifyCursorReq.onsuccess = event => {
+          const modifyCursor = event.target.result;
+          resolve(modifyCursor);
         };
-        const cursorReq3 = daysAheadOS.openCursor(this.date);
-        cursorReq3.onsuccess = event => {
-          const cursor3 = event.target.result;
-          if (cursor3) {
-            const today = cursor3.value;
-            today.tasks = today.tasks.filter(item => {
-              return item !== taskId;
-            });
-            today.skippedTasks = today.skippedTasks++;
-            cursor3.update(today);
-          }
-        };
-      }
-    };
+      }).then(modifyCursor => {
+        const today = modifyCursor.value;
+        if (today.tasks.includes(taskId)) {
+          const removeTaskId = new Promise((resolve, reject) => {
+            console.log(`taskId: ${taskId}`);
+            today.tasks = today.tasks.filter(item => item !== taskId);
+            today.skippedTasks++;
+            const removeProcess = modifyCursor.update(today);
+            removeProcess.onsuccess = () => {
+              return resolve();
+            };
+          });
+          return Promise.resolve(removeTaskId);
+        } else {
+          return Promise.reject(new ReferenceError('The task id does not exist in today tasks list'));
+        }
+      });
 
-    // TODO: ui function
+      return modifyTodayProcess;
+    }
+
+    function scheduling(todayWeekday, task, targetDate) {
+      const schedulingProcess = new Promise((resolve, reject) => {
+        const objectStoreReq = getOS(['days_ahead']);
+        objectStoreReq.then(objectStore => {
+          return Promise.resolve(objectStore);
+        });
+        resolve(objectStoreReq);
+      }).then(objectStore => {
+        const cursorProcess = new Promise((resolve, reject) => {
+          const daysAheadOS = objectStore[0];
+          if (!targetDate) {
+            const weekdaysToken = parseInt(task.remainedDays / task.pattern.length);
+            const singleDaysToken = task.remainedDays % task.pattern.length;
+            const patternPart1 = task.pattern.filter(element => element >= todayWeekday);
+            const patternPart2 = task.pattern.filter(element => element < todayWeekday);
+            const pattern = [...patternPart1, ...patternPart2];
+            const daysInterval = (weekdaysToken * 7) + singleDaysToken;
+            targetDate = calculateFewDaysBeforeOrAfter(daysInterval, 'after');
+          }
+          console.log(targetDate);
+          const cursorReq = daysAheadOS.openCursor(targetDate);
+          cursorReq.onsuccess = event => {
+            const cursor = event.target.result;
+            resolve(cursor);
+          };
+        }).then(cursor => {
+          if (cursor) {
+            const _targetDate = cursor.value;
+            const updateProcess = new Promise((resolve, reject) => {
+              _targetDate.tasks.push(taskId);
+              const updateReq = cursor.update(_targetDate);
+              updateReq.onsuccess = () => {
+                return resolve();
+              };
+            });
+            return Promise.resolve(updateProcess);
+          } else {
+            const retryTheProcess = new Promise((resolve, reject) => {
+              // The target date does not exist in object store, so we retry the process
+              const _targetDate = new Day(targetDate);
+              resolve(_targetDate);
+            }).then(() => {
+              // "rtp" stands for "retry the process"
+              const rtp = scheduling(todayWeekday, task, targetDate);
+              return Promise.resolve(rtp);
+            });
+            return Promise.resolve(retryTheProcess);
+          }
+        });
+        return Promise.resolve(cursorProcess);
+      });
+
+      return schedulingProcess;
+    }
+
+    const skipTaskProcess = new Promise((resolve, reject) => {
+      const objectStoresReq = getOS(['todo_items', 'days_ahead']);
+      objectStoresReq.then(responses => {
+        return Promise.resolve(responses);
+      });
+      resolve(objectStoresReq);
+    }).then(objectStores => {
+      const todoItemsOS = objectStores[0];
+      const daysAheadOS = objectStores[1];
+      // Verify the task and access the scheduledDays
+      const cursorProcess = new Promise((resolve, reject) => {
+        const todoCursorReq = todoItemsOS.openCursor(taskId);
+        todoCursorReq.onsuccess = event => {
+          const todoCursor = event.target.result;
+          resolve(todoCursor);
+        }
+      }).then(todoCursor => {
+        if (todoCursor) {
+          const targetTask = todoCursor.value;
+          // Remove the task id from tasks in today object
+          const _modifyToday = modifyToday(daysAheadOS, this.date);
+          // Schedule for another date
+          const schedulingTask = scheduling(this.weekday, targetTask);
+          const promiseAnswer = Promise.all([_modifyToday, schedulingTask]);
+          promiseAnswer.then(responses => {
+            return Promise.resolve(responses);
+          });
+          return Promise.resolve(promiseAnswer);
+        } else {
+          return Promise.reject(new ReferenceError('The task id does not exist in object store'));
+        }
+      });
+      return Promise.resolve(cursorProcess);
+    });
+
+    return skipTaskProcess;
   }
 
-  async doneTask(taskId) {
+  doneTask(taskId) {
     // Handeling argument and the date
     if (typeof taskId !== 'string') {
       throw new TypeError('Invalid argument');
     }
     const targetDate = new Date(this.date).getTime();
     const now = new Date(_Date('en-US')).getTime();
-    if (targetDate < now) {
-      throw new RangeError('This date is over');
+    if (targetDate !== now) {
+      throw new RangeError('This function can not execute for this date');
     }
     // Main code
-    const databaseReq = await window.indexedDB.open('todo_db', 1);
-    let database;
-    databaseReq.onsuccess = event => {
-      database = event.target.result;
-    };
-    // transaction1 is for todo item
-    const transaction1 = await database.transaction(['todo_items'], 'readwrite');
-    const todoItemsOS = transaction1.objectStore('todo_items');
-    const cursorReq1 = todoItemsOS.openCursor(taskId);
-    cursorReq1.onsuccess = event => {
-      const cursor = event.target.result;
-      if (cursor) {
-        const todoItem = cursor.result;
-        todoItem.scheduledDays = todoItem.scheduledDays--;
-        cursor.update(todoItem);
-      }
-    };
-    // transaction2 is for days ahead
-    const transaction2 = database.transaction(['days_ahead'], 'readwrite');
-    const daysAheadOS = transaction2.objectStore('days_ahead');
-    const cursorReq2 = daysAheadOS.openCursor(this.date);
-    cursorReq2.onsuccess = event => {
-      const cursor = event.target.result;
-      if (cursor) {
-        const today = cursor.result;
-        today.doneTasks = today.doneTasks++;
-        cursor.update(today);
-      }
-    };
+    const doneTaskProcess = new Promise((resolve, reject) => {
+      const objectStoresReq = getOS(['days_ahead', 'todo_items']);
+      objectStoresReq.then(responses => {
+        return Promise.resolve(responses);
+      });
+      resolve(objectStoresReq);
+    }).then(objectStores => {
+      const modifyTask = new Promise((resolve, reject) => {
+        const todoItemsOS = objectStores[0];
+        const cursorReq = todoItemsOS.openCursor(taskId);
+        cursorReq.onsuccess = event => {
+          const cursor = event.target.result;
+          resolve(cursor);
+        };
+      }).then(cursor => {
+        if (cursor) {
+          const updateProcess = new Promise((resolve, reject) => {
+            const targetTask = cursor.value;
+            targetTask.remainedDays--;
+            const updateReq = cursor.update(targetTask);
+            updateReq.onsuccess = () => {
+              // If it is true we should call DayObject.doneTask() function
+              const isItFinished = targetTask.remainedDays <= 0 ? true : false;
+              return Promise.resolve(isItFinished);
+            };
+          });
+          return Promise.resolve(updateProcess);
+        } else {
+          return Promise.reject(new ReferenceError('The task id does not exist in object store'));
+        }
+      });
 
-    // TODO: ui function
-    await uiFunc();
+      const modifyToday = new Promise((resolve, reject) => {
+        const daysAheadOS = objectStores[1];
+        const cursorReq = daysAheadOS.openCursor(this.date);
+        cursorReq.onsuccess = event => {
+          const cursor = event.target.result;
+          resolve(cursor);
+        };
+      }).then(cursor => {
+        const targetDate = cursor.value;
+        if (targetDate.tasks.includes(taskId)) {
+          const updateProcess = new Promise((resolve, reject) => {
+            targetDate.doneTasks++;
+            const updateReq = cursor.update(targetDate);
+            updateReq.onsuccess = () => {
+              return Promise.resolve();
+            };
+          });
+          return Promise.resolve(updateProcess);
+        } else {
+          return Promise.reject(new ReferenceError('The task id does not exist in today tasks list'));
+        }
+      });
+
+      const promiseAnswer = Promise.all([modifyTask, modifyToday]);
+      return Promise.resolve(promiseAnswer);
+    });
+
+    return doneTaskProcess;
   }
 
   static async delete() {
@@ -529,38 +630,87 @@ class Day {
     };
   }
 
-  static async memorize() {
+  static memorize() {
     // Main code
-    const databaseReq = window.indexedDB.open('todo_db', 1);
-    let database;
-    databaseReq.onsuccess = event => {
-      database = event.target.result;
-    };
-    // Preparation the spent_week objectStore
-    const spentWeekOSTransaction = await database.transaction(['spent_week'], 'readwrite');
-    const spentWeekOS = spentWeekOSTransaction.objectStore('spent_week');
-    // Preparation the days_ahead objectStore
-    const daysAheadTransaction = database.transaction(['days_ahead'], 'readwrite');
-    const daysAheadOS = daysAheadTransaction.objectStore('days_ahead');
-    /* Searching for dates in daysAheadOS that spent
-    to delete them from daysAheadOS and add them to spentWeekOS */
-    const now = _Date('en-US');
-    const cursorReq = daysAheadOS.openCursor();
-    cursorReq.onsuccess = event => {
-      const cursor = event.target.result;
-      if (cursor) {
-        const record = cursor.value;
-        if (record.date === now) {
-          // Add the target date to spentWeekOS objectStore
-          const addObject = record;
-          addObject.tasks = record.tasks.length;
-          const addReq = spentWeekOS.add(addObject);
-          // Remove the target date from daysAhead objectStore
-          const removeReq = daysAheadOS.delete(record.date);
+    const memorizeProcess = new Promise((resolve, reject) => {
+      const objectStoresReq = getOS(['days_ahead', 'spent_week']);
+      objectStoresReq.then(objectStores => {
+        return Promise.resolve(objectStores);
+      });
+      resolve(objectStoresReq);
+    }).then(objectStores => {
+      /* First delete the target date from days_ahead object store
+      then add them to spent_week object store */
+      const targetDateProcessing = new Promise((resolve, reject) => {
+        const daysAheadOS = objectStores[0];
+        const cursorProcess = new Promise((resolve, reject) => {
+          const cursorReq = daysAheadOS.openCursor();
+          const deleteRequests = [];
+          cursorReq.onsuccess = event => {
+            const cursor = event.target.result;
+            if (cursor) {
+              const targetDate = cursor.value;
+              const targetDateTime = new Date(targetDate.date).getTime();
+              const now = new Date(_Date('en-US')).getTime();
+              if (now > targetDateTime) {
+                const deleteProcess = new Promise((resolve, reject) => {
+                  const deleteReq = daysAheadOS.delete(targetDate.date);
+                  deleteReq.onsuccess = () => {
+                    return resolve(targetDate);
+                  };
+                });
+                deleteRequests.push(deleteProcess);
+                cursor.continue();
+              } else {
+                cursor.continue();
+              }
+            } else {
+              if (deleteRequests.length) {
+                const deleteRequestsResults = Promise.all(deleteRequests);
+                deleteRequestsResults.then(responses => {
+                  return Promise.resolve(responses);
+                });
+                return resolve(deleteRequestsResults);
+              } else {
+                return resolve();
+              }
+            }
+          };
+        });
+        resolve(cursorProcess);
+      }).then(spentDatesObj => {
+        // Modify the objects and preparing for add them to spent_week object store
+        spentDatesObj = spentDatesObj.map(obj => {
+          return {
+            date: obj.date,
+            tasks: obj.tasks.length,
+            doneTasks: obj.doneTasks,
+            skippedTasks: obj.skippedTasks,
+          }
+        });
+        const spentWeekOS = objectStores[1];
+        // Add the deleted days to spent_week object store
+        const addRequests = [];
+        let targetDate;
+        for(targetDate of spentDatesObj) {
+          const addProcess = new Promise((resolve, reject) => {
+            const addReq = spentWeekOS.add(targetDate);
+            addReq.onsuccess = () => {
+              return resolve();
+            };
+          });
+          addRequests.push(addProcess);
         }
-        cursor.continue();
-      }
-    };
+        const requestsResults = Promise.all(addRequests);
+        requestsResults.then(responses => {
+          return Promise.resolve(responses);
+        });
+        return Promise.resolve(requestsResults);
+      });
+      return Promise.resolve(targetDateProcessing);
+    });
+
+    return memorizeProcess;
   }
 }
 
@@ -661,7 +811,7 @@ class ToDoItem {
                 updateReq.onsuccess = () => {
                   return resolve();
                 };
-              })
+              });
               return Promise.resolve(updateProcess);
             } else {
               const retryTheProcess = new Promise((resolve, reject) => {
@@ -729,7 +879,7 @@ class ToDoItem {
             let calculatedDate, step = 0;
             do {
               if (flagDates[j]) {
-                calculatedDate = calculateFewDaysBeforeOrAfter(7, 'after', 'en-US', flagDates);
+                calculatedDate = calculateFewDaysBeforeOrAfter(7, 'after', 'en-US', flagDates[j]);
               } else {
                 calculatedDate = calculateFewDaysBeforeOrAfter(step, 'after', 'en-US', originDate);
               }
