@@ -254,6 +254,9 @@ function getOS(objectStores) {
       daysAhead.createIndex('skippedTasks', 'skippedTasks', {
         unique: false
       });
+      daysAhead.createIndex('lostTasks', 'lostTasks', {
+        unique: false
+      });
       // Second objectStore
       const todoItems = database.createObjectStore('todo_items', { keyPath: 'id', autoIncrement: false });
       todoItems.createIndex('id', 'id', {
@@ -270,6 +273,9 @@ function getOS(objectStores) {
       });
       todoItems.createIndex('pattern', 'pattern', {
         unique: false
+      });
+      todoItems.createIndex('startDate', 'startDate', {
+        unique: false,
       });
       todoItems.createIndex('pin', 'pin', {
         unique: false
@@ -289,6 +295,9 @@ function getOS(objectStores) {
         unique: false
       });
       spentWeekOS.createIndex('skippedTasks', 'skippedTasks', {
+        unique: false
+      });
+      spentWeekOS.createIndex('lostTasks', 'lostTasks', {
         unique: false
       });
     };
@@ -352,6 +361,7 @@ class Day {
           this.doneTasks = targetDate.doneTasks;
           this.weekday = targetDate.weekday;
           this.skippedTasks = targetDate.skippedTasks;
+          this.lostTasks = targetDate.lostTasks;
           Object.freeze(this);
           Object.seal(this);
           Object.preventExtensions(this);
@@ -363,12 +373,14 @@ class Day {
           this.doneTasks = 0;
           this.skippedTasks = 0;
           this.weekday = weekday;
+          this.lostTasks = 0;
           const newDay = {
             date: this.date,
             tasks: this.tasks,
             doneTasks: this.doneTasks,
             weekday: this.weekday,
             skippedTasks: this.skippedTasks,
+            lostTasks: this.lostTasks,
           };
           const addProcess = new Promise((resolve, reject) => {
             const addRequest = daysAheadOS.add(newDay);
@@ -686,6 +698,7 @@ class Day {
             tasks: obj.tasks.length,
             doneTasks: obj.doneTasks,
             skippedTasks: obj.skippedTasks,
+            lostTasks: obj.lostTasks,
           }
         });
         const spentWeekOS = objectStores[1];
@@ -717,7 +730,7 @@ class Day {
 class ToDoItem {
   /* WARNING: ToDoItem vqti vas on roz tmom shde dige edit nshe
   dob bshinm function edit ro check khonm chon vqti DayObject.doneTask() rah miofte yki az scheduledDays km mikne o ok mish */
-  constructor(subject, timer, scheduledDays = 0, pattern = [0, 1, 2, 3, 4, 5, 6], originDate = '', pin = false, description = '', id = '') {
+  constructor(subject, timer, scheduledDays = 0, pattern = [0, 1, 2, 3, 4, 5, 6], startDate = '', pin = false, description = '', id = '') {
     switch (true) {
       case typeof id !== 'string':
         throw new TypeError('\"id\" is invalid argument');
@@ -729,13 +742,13 @@ class ToDoItem {
         throw new TypeError('\"timer\" is invalid argument');
       case !pattern instanceof Array:
         throw new TypeError('\"pattern\" is invalid argument');
-      case typeof originDate !== 'string':
-        throw new TypeError('\"originDate\" is invalid argument');
+      case typeof startDate !== 'string':
+        throw new TypeError('\"startDate\" is invalid argument');
       case typeof pin !== 'boolean':
         throw ['type', pin];
       case typeof description !== 'string':
         throw new TypeError('\"description\" is invalid argument');
-      case id && _caller() !== 'restore':
+      case id && _caller(3) !== 'promise callback*restore':
         throw new Error('Permission denied to access property \"id\"');
       case scheduledDays < 0 && !Number.isInteger(scheduledDays):
         throw new RangeError('\'scheduledDays\' count must be non-negative');
@@ -756,19 +769,19 @@ class ToDoItem {
         } else {
           throw new RangeError('Invalid array length');
         }
-        // Verify originDate
-        if (originDate) {
-          if (!new Date(originDate).getTime()) {
+        // Verify startDate
+        if (startDate) {
+          if (!new Date(startDate).getTime()) {
             throw new RangeError('Invalid date');
           } else {
-            const _date = new Date(originDate).getTime();
+            const _date = new Date(startDate).getTime();
             const now = new Date(_Date('en-US')).getTime();
             if (_date < now) {
               throw new RangeError('This date is over');
             }
           }
         } else {
-          originDate = _Date('en-US');
+          startDate = _Date('en-US');
         }
     }
 
@@ -780,11 +793,11 @@ class ToDoItem {
     this.description = description;
     this.remainedDays = scheduledDays;
     this.pattern = pattern;
+    this.startDate = startDate;
     /* FIXME: inja ro bdn byd az package uuid estfade krd
     2- momkne k id tkrari bash pas byd ye check knm
     3- momkne khod uuid moshkl pyda kne pas byd toy try...catch bash */
     if (id) {
-      console.info('restore');
       this.id = id;
     } else {
       function addTaskToDate(date, taskId) {
@@ -852,6 +865,7 @@ class ToDoItem {
             pin: this.pin,
             description: this.description,
             pattern: this.pattern,
+            startDate: this.startDate,
           };
           // Add todo item to todo_items object store
           // "TIOS" stands for "Todo Item Object Store"
@@ -865,7 +879,7 @@ class ToDoItem {
           /* Modify the this.pattern and sort it to match with today weekday cause:
           if we don't do this the difference between first target weekday and today weekday is be negative
           and can't find it in object store */
-          const originWeekday = new Date(originDate).getDay();
+          const originWeekday = new Date(startDate).getDay();
           const patternPart1 = this.pattern.filter(element => element >= originWeekday);
           const patternPart2 = this.pattern.filter(element => element < originWeekday);
           const pattern = [...patternPart1, ...patternPart2];
@@ -881,7 +895,7 @@ class ToDoItem {
               if (flagDates[j]) {
                 calculatedDate = calculateFewDaysBeforeOrAfter(7, 'after', 'en-US', flagDates[j]);
               } else {
-                calculatedDate = calculateFewDaysBeforeOrAfter(step, 'after', 'en-US', originDate);
+                calculatedDate = calculateFewDaysBeforeOrAfter(step, 'after', 'en-US', startDate);
               }
               step++;
             } while (new Date(calculatedDate).getDay() !== pattern[j]);
@@ -1162,83 +1176,127 @@ class ToDoItem {
     }
   }
 
-  async delete() {
+  delete() {
     // Main code
-    const databaseReq = window.indexedDB.open('todo_db', 1);
-    let database;
-    databaseReq.onsuccess = event => {
-      database = event.target.result;
-    };
-    // Delete the target todo item from all days with its pattern
-    const daysAheadTransaction = await database.transaction(['days_ahead'], 'readwrite');
-    const daysAheadOS = daysAheadTransaction.objectStore('days_ahead');
-    let weekdaysToken, j = 0;
-    const length = this.pattern.length;
-    do {
-      if (j >= length) {
-        break;
-      }
-      weekdaysToken = this.scheduledDays / (length - j);
-      j++;
-    } while (!Number.isInteger(weekdaysToken));
-    // WARNING: inja ye check knm age roy index miad pas fk knm byd yki dige hm km krd
-    // TODO: ino bdn test knm k ba ye -1 ok mish ya n
-    let exceptionToken = length - j - 1;
-    for (j = 0; j < length; j++) {
-      const cursorReq = daysAheadOS.openCursor(this.pattern[j]);
-      let et = exceptionToken > 0 ? 1 : 0;
-      cursorReq.onsuccess = event => {
-        let wt = weekdaysToken;
-        const cursor = event.target.result;
-        if (cursor && (wt + et)) {
-          const targetDay = cursor.value;
-          targetDay.tasks = targetDay.tasks.filter(taskId => {
-            return taskId !== this.id;
-          });
-          const updateReq = cursor.update(targetDay);
-          updateReq.onsuccess = () => {
-            wt--;
-            cursor.continue();
+    const deleteProcess = new Promise((resolve, reject) => {
+      const objectStoresReq = getOS(['days_ahead', 'todo_items']);
+      objectStoresReq.then(objectStores => {
+        return Promise.resolve(objectStores);
+      });
+      resolve(objectStoresReq);
+    }).then(objectStores => {
+      // Delete todo item from target dates
+      const deleteRequests = [];
+      /* Modify the this.pattern and sort it to match with today weekday cause:
+      if we don't do this the difference between first target weekday and today weekday is be negative
+      and can't find it in object store */
+      const originDate = new Date(this.startDate).getTime() >= new Date().getTime() ? this.startDate : _Date('en-US');
+      const todayWeekday = new Date(originDate).getDay();
+      const patternPart1 = this.pattern.filter(element => element >= todayWeekday);
+      const patternPart2 = this.pattern.filter(element => element < todayWeekday);
+      const pattern = [...patternPart1, ...patternPart2];
+      /* TODO: byd barash ye comment khob bzrm; jryansh hm ine k in vas calculatedDate has k
+      az edame on bre jolo (age tedad mal ye weekday az 1 bishtr bd) */
+      const flagDates = new Array(pattern.length);
+      const daysAheadOS = objectStores[0];
+      let i, j;
+      const limit = this.remainedDays ? this.remainedDays : 1;
+      for (i = 0, j = 0; i < limit; i++, j++) {
+        j = j >= pattern.length ? 0 : j;
+        let calculatedDate, step = 0;
+        do {
+          if (flagDates[j]) {
+            calculatedDate = calculateFewDaysBeforeOrAfter(7, 'after', 'en-US', flagDates[j]);
+          } else {
+            calculatedDate = calculateFewDaysBeforeOrAfter(step, 'after', 'en-US', originDate);
+          }
+          step++;
+        } while (new Date(calculatedDate).getDay() !== pattern[j]);
+        flagDates[j] = calculatedDate;
+        // "DAOS" stands for "days ahead object store"
+        const deleteFromDAOS  = new Promise((resolve, reject) => {
+          const cursorReq = daysAheadOS.openCursor(calculatedDate);
+          cursorReq.onsuccess = event => {
+            const cursor = event.target.result;
+            resolve(cursor);
           };
-          exceptionToken--;
-        }
-      };
-    }
-    // Delete the target todo item from todoItemsOS
-    const todoItemTransaction = database.transaction(['todo_items'], 'readwrite');
-    const todoItemsOS = todoItemTransaction.objectStore('todo_items');
-    const request = todoItemsOS.delete(this.id);
-    todoItemTransaction.oncomplete = () => {
-      // TODO: ui function
-    };
+        }).then(cursor => {
+          if (cursor) {
+            const deleteFromTargetDate = new Promise((resolve, reject) => {
+              const targetDate = cursor.value;
+              targetDate.tasks = targetDate.tasks.filter(element => element !== this.id);
+              const deleteReq = cursor.update(targetDate);
+              deleteReq.onsuccess = () => {
+                return resolve();
+              };
+            });
+            return Promise.resolve(deleteFromTargetDate);
+          }
+        });
+        deleteRequests.push(deleteFromDAOS);
+      }
+      // Check for all the update requests be successful
+      const requestsResults = Promise.all(deleteRequests);
+      requestsResults.then(responses => {
+        // Delete the task from todo_items object store
+        const todoItemsOS = objectStores[1];
+        // "TIOS" stands for "Todo Items Object Store"
+        const deleteFromTIOS = new Promise((resolve, reject) => {
+          const cursorReq = todoItemsOS.openCursor(this.id);
+          cursorReq.onsuccess = event => {
+            const cursor = event.target.result;
+            if (cursor) {
+              const deleteFromOS = new Promise((resolve, reject) => {
+                const deleteReq = todoItemsOS.delete(this.id);
+                deleteReq.onsuccess = () => {
+                  return resolve();
+                }
+              });
+              return resolve(deleteFromOS);
+            } else {
+              return resolve();
+            }
+          };
+        });
+        return Promise.resolve(deleteFromTIOS);
+      });
+      return Promise.resolve(requestsResults);
+    });
+
+    return deleteProcess;
   }
 
-  static async restore(taskId) {
+  static restore(taskId) {
     // Handeling the argument
     if (typeof taskId !== 'string') {
       throw new TypeError('Invalid argument');
     }
     // Main code
-    const databaseReq = await window.indexedDB.open('todo_db', 1);
-    let database;
-    databaseReq.onsuccess = event => {
-      database = event.target.result;
-    };
-    const transaction = await database.transaction(['todo_items'], 'readwrite');
-    const todoItemsOS = transaction.objectStore('todo_db');
-    const cursorReq = todoItemsOS.openCursor(taskId);
-    let restoredTask;
-    cursorReq.onsuccess = event => {
-      const cursor = event.target.result;
-      if (cursor) {
-        const targetTask = cursor.value;
-        restoredTask = new ToDoItem(targetTask.subject, targetTask.timer, targetTask.scheduledDays,
-        targetTask.pattern, targetTask.pin, targetTask.description, targetTask.id);
-        // IDEA: age besh hminja jay kol function return krd khobe
-      } else {
-        throw new RangeError('Can not find the taskId in database');
-      }
-    };
-    return await restoredTask;
+    const restoreProcess = new Promise((resolve, reject) => {
+      const objectStoreReq = getOS(['todo_items']);
+      objectStoreReq.then(objectStore => {
+        return Promise.resolve(objectStore);
+      });
+      resolve(objectStoreReq);
+    }).then(objectStore => {
+      const todoItemsOS = objectStore[0];
+      const cursorProcess = new Promise((resolve, reject) => {
+        const cursorReq = todoItemsOS.openCursor(taskId);
+        cursorReq.onsuccess = event => {
+          const cursor = event.target.result;
+          if (cursor) {
+            const targetTask = cursor.value;
+            const restoredTask = new ToDoItem(targetTask.subject, targetTask.timer, targetTask.scheduledDays,
+            targetTask.pattern, targetTask.startDate, targetTask.pin, targetTask.description, targetTask.id);
+            return resolve(restoredTask);
+          } else {
+            return reject(new ReferenceError('The task id does not exist in object store'));
+          }
+        };
+      });
+      return Promise.resolve(cursorProcess);
+    });
+
+    return restoreProcess;
   }
 }
