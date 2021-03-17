@@ -18,21 +18,26 @@ onaii k ysare mire vas ui function ro EventListener shono avaz knm o bzrm roy tr
  */
  // QUESTION: age bjay inke toy promise nahaii bznim "return Promise.resolve(...)" khod natije ro return knim chi mish?
 function _caller(depth = 0) {
-  depth += 2;
-  const stackTrace = (new Error()).stack; // Only tested in latest FF and Chrome
-  let callerName = stackTrace.replace(/^Error\s+/, ''); // Sanitize Chrome
-  callerName = callerName.split('\n')[depth].trim(); // 1st item is this, 2nd item is _caller function, 3th item is caller
-  callerName = callerName.replace(/^\s+at Object./, ''); // Sanitize Chrome
-  callerName = callerName.replace(/ \(.+\)$/, ''); // Sanitize Chrome
-  if (callerName.slice(0, 3) === 'at ') {
-    callerName = callerName.slice(3); // Sanitize Chrome
+  try {
+    depth += 2;
+    const stackTrace = (new Error()).stack; // Only tested in latest FF and Chrome
+    let callerName = stackTrace.replace(/^Error\s+/, ''); // Sanitize Chrome
+    callerName = callerName.split('\n')[depth].trim(); // 1st item is this, 2nd item is _caller function, 3th item is caller
+    callerName = callerName.replace(/^\s+at Object./, ''); // Sanitize Chrome
+    callerName = callerName.replace(/ \(.+\)$/, ''); // Sanitize Chrome
+    if (callerName.slice(0, 3) === 'at ') {
+      callerName = callerName.slice(3); // Sanitize Chrome
+    }
+    callerName = callerName.replace(/\@.+/, ''); // Sanitize Firefox
+    return callerName;
+  } catch (exception) {
+    console.warn(exception);
+    return undefined;
   }
-  callerName = callerName.replace(/\@.+/, ''); // Sanitize Firefox
-  return callerName;
 }
 
 function removeDuplicateValue(array) {
-  // Handeling argument
+  // Verify argument
   if (!array instanceof Array) {
     throw new TypeError(`${array} is invalid argument`);
   }
@@ -52,7 +57,7 @@ function removeDuplicateValue(array) {
  }
 
 function _Date(local, splicer = '/') {
-  // Handeling the arguments
+  // Verify the arguments
   switch (true) {
     case typeof local !== 'string':
       throw new TypeError(`${local} is invalid argument`);
@@ -127,7 +132,7 @@ function _Date(local, splicer = '/') {
 }
 
 function calculateFewDaysBeforeOrAfter(numberOfDays, direction, local = 'en-US', date = '', splicer = '/') {
-  // Handeling the arguments
+  // Verify the arguments
   switch (true) {
     case typeof numberOfDays !== 'number':
       throw new TypeError('\'numberOfDays\' argument has invalid value');
@@ -157,7 +162,7 @@ function calculateFewDaysBeforeOrAfter(numberOfDays, direction, local = 'en-US',
   const interval = numberOfDays * millisecInDay;
   const originDateInMillisec = new Date(date).getTime();
   const targetDayInMillisec = direction === 'after' ? originDateInMillisec + interval
-  : Math.abs(originDateInMillisec + interval);
+  : originDateInMillisec - interval;
   let targetDate = new Date(targetDayInMillisec).toDateString();
   targetDate = targetDate.slice(4, 16);
   switch (true) {
@@ -239,7 +244,7 @@ function getOS(objectStores) {
       const database = event.target.result;
       // First objectStore
       const daysAhead = database.createObjectStore('days_ahead', { keyPath: 'date', autoIncrement: false });
-      daysAhead.createIndex('data', 'date', {
+      daysAhead.createIndex('date', 'date', {
         unique: true
       });
       daysAhead.createIndex('tasks', 'tasks', {
@@ -258,7 +263,7 @@ function getOS(objectStores) {
         unique: false
       });
       // Second objectStore
-      const todoItems = database.createObjectStore('todo_items', { keyPath: 'id', autoIncrement: false });
+      const todoItems = database.createObjectStore('todo_items', { keyPath: 'id', autoIncrement: true });
       todoItems.createIndex('id', 'id', {
         unique: true
       });
@@ -285,7 +290,7 @@ function getOS(objectStores) {
       });
       // Third objectStore
       const spentWeekOS = database.createObjectStore('spent_week', { keyPath: 'date', autoIncrement: false });
-      spentWeekOS.createIndex('data', 'date', {
+      spentWeekOS.createIndex('date', 'date', {
         unique: true
       });
       spentWeekOS.createIndex('tasks', 'tasks', {
@@ -319,7 +324,7 @@ function getOS(objectStores) {
 
 class Day {
   constructor(date = '') {
-    // Handeling the date argument
+    // Verify the date argument
     if (typeof date !== 'string') {
       throw new TypeError(`${date} is invalid argument`);
     } else if (date) {
@@ -406,7 +411,7 @@ class Day {
   }
 
   skipTask(taskId) {
-    // Handeling argument and the date
+    // Verify argument and the date
     if (typeof taskId !== 'string') {
       throw new TypeError('The taskId value is invalid');
     }
@@ -539,8 +544,76 @@ class Day {
     return skipTaskProcess;
   }
 
+  loseTask(taskId) {
+    // Verify argument and the date
+    if (typeof taskId !== 'string') {
+      throw new TypeError('Invalid argument');
+    }
+    const targetDate = new Date(this.date).getTime();
+    const now = new Date(_Date('en-US')).getTime();
+    if (targetDate !== now) {
+      throw new RangeError('This function can not execute for this date');
+    }
+    // Main code
+    const lostTaskProcess = new Promise((resolve, reject) => {
+      const objectStoresReq = getOS(['days_ahead', 'todo_items']);
+      objectStoresReq.then(objectStores => {
+        return Promise.resolve(objectStores);
+      });
+      resolve(objectStoresReq);
+    }).then(objectStores => {
+      const deleteAndModifyProcess = new Promise((resolve, reject) => {
+        // Delete task from today todo list and update "lostTasks" property
+        const daysAheadOS = objectStores[0];
+        const cursorProcess = new Promise((resolve, reject) => {
+          const cursorReq = daysAheadOS.openCursor(this.date);
+          cursorReq.onsuccess = event => {
+            const cursor = event.target.result;
+            const today = cursor.value;
+            today.tasks = today.tasks.filter(id => id !== taskId);
+            today.lostTasks++;
+            const updateProcess = new Promise((resolve, reject) => {
+              const updateReq = cursor.update(today);
+              updateReq.onsuccess = () => {
+                return resolve();
+              };
+            });
+            return resolve(updateProcess);
+          };
+        });
+        resolve(cursorProcess);
+      }).then(response => {
+        // Update the "remainedDays" property in target task object
+        const todoItemsOS = objectStores[1];
+        const cursorProcess = new Promise((resolve, reject) => {
+          const cursorReq = todoItemsOS.openCursor(taskId);
+          cursorReq.onsuccess = event => {
+            const cursor = event.target.result;
+            if (cursor) {
+              const targetTask = cursor.value;
+              targetTask.remainedDays--;
+              const updateProcess = new Promise((resolve, reject) => {
+                const updateReq = cursor.update(targetTask);
+                updateReq.onsuccess = () => {
+                  return resolve();
+                };
+              });
+              return resolve(updateProcess);
+            } else {
+              return reject(new ReferenceError('The task id does not exist in object store'));
+            }
+          };
+        });
+        return Promise.resolve(cursorProcess);
+      });
+      return Promise.resolve(deleteAndModifyProcess);
+    });
+
+    return lostTaskProcess;
+  }
+
   doneTask(taskId) {
-    // Handeling argument and the date
+    // Verify argument and the date
     if (typeof taskId !== 'string') {
       throw new TypeError('Invalid argument');
     }
@@ -725,6 +798,43 @@ class Day {
 
     return memorizeProcess;
   }
+
+  static getDate(targetDate) {
+    // Verify argument
+    if (typeof targetDate !== 'string') {
+      throw new TypeError(`${targetDate} is invalid argument`);
+    } else if (!new Date(targetDate).getDate()) {
+      throw new RangeError('Invalid date');
+    }
+    // Main code
+    const dateToTime = new Date(targetDate).getTime();
+    const now = new Date(_Date('en-US')).getTime();
+    const objectStoreName = dateToTime < now ? ['spent_week'] : ['days_ahead'];
+    const gettingProcess = new Promise((resolve, reject) => {
+      const objectStoreReq = getOS(objectStoreName);
+      objectStoreReq.then(response => {
+        return Promise.resolve(response);
+      });
+      resolve(objectStoreReq);
+    }).then(objectStore => {
+      objectStore = objectStore[0];
+      const cursorProcess = new Promise((resolve, reject) => {
+        const cursorReq = objectStore.openCursor(targetDate);
+        cursorReq.onsuccess = event => {
+          const cursor = event.target.result;
+          if (cursor) {
+            const targetDateObject = cursor.value;
+            targetDateObject.tasks = targetDateObject.tasks.length || targetDateObject.tasks;
+            return resolve(targetDateObject);
+          } else {
+            return resolve({ date: targetDate, tasks: 0, doneTasks: 0, skippedTasks: 0, lostTasks: 0, });
+          }
+        }
+      });
+      return Promise.resolve(cursorProcess);
+    });
+    return gettingProcess;
+  }
 }
 
 class ToDoItem {
@@ -770,18 +880,22 @@ class ToDoItem {
           throw new RangeError('Invalid array length');
         }
         // Verify startDate
-        if (startDate) {
-          if (!new Date(startDate).getTime()) {
-            throw new RangeError('Invalid date');
-          } else {
-            const _date = new Date(startDate).getTime();
-            const now = new Date(_Date('en-US')).getTime();
-            if (_date < now) {
-              throw new RangeError('This date is over');
+        if (_caller(3) !== 'promise callback*restore') {
+          if (startDate) {
+            if (!new Date(startDate).getTime()) {
+              throw new RangeError('Invalid date');
+            } else if (!pattern.includes(new Date(startDate).getDay())) {
+              throw new RangeError(`${startDate} can not match with the weekday pattern`);
+            } else {
+              const _date = new Date(startDate).getTime();
+              const now = new Date(_Date('en-US')).getTime();
+              if (_date < now) {
+                throw new RangeError(`Start date(${startDate}) has expired`);
+              }
             }
+          } else {
+            startDate = _Date('en-US');
           }
-        } else {
-          startDate = _Date('en-US');
         }
     }
 
@@ -794,9 +908,6 @@ class ToDoItem {
     this.remainedDays = scheduledDays;
     this.pattern = pattern;
     this.startDate = startDate;
-    /* FIXME: inja ro bdn byd az package uuid estfade krd
-    2- momkne k id tkrari bash pas byd ye check knm
-    3- momkne khod uuid moshkl pyda kne pas byd toy try...catch bash */
     if (id) {
       this.id = id;
     } else {
@@ -1191,9 +1302,9 @@ class ToDoItem {
       if we don't do this the difference between first target weekday and today weekday is be negative
       and can't find it in object store */
       const originDate = new Date(this.startDate).getTime() >= new Date().getTime() ? this.startDate : _Date('en-US');
-      const todayWeekday = new Date(originDate).getDay();
-      const patternPart1 = this.pattern.filter(element => element >= todayWeekday);
-      const patternPart2 = this.pattern.filter(element => element < todayWeekday);
+      const originWeekday = new Date(originDate).getDay();
+      const patternPart1 = this.pattern.filter(element => element >= originWeekday);
+      const patternPart2 = this.pattern.filter(element => element < originWeekday);
       const pattern = [...patternPart1, ...patternPart2];
       /* TODO: byd barash ye comment khob bzrm; jryansh hm ine k in vas calculatedDate has k
       az edame on bre jolo (age tedad mal ye weekday az 1 bishtr bd) */
@@ -1247,9 +1358,18 @@ class ToDoItem {
             const cursor = event.target.result;
             if (cursor) {
               const deleteFromOS = new Promise((resolve, reject) => {
+                const deletedTask = {
+                  subject: this.subject,
+                  timer: this.timer,
+                  scheduledDays: this.scheduledDays,
+                  pattern: this.pattern,
+                  startDate: this.startDate,
+                  pin: this.pin,
+                  description: this.description,
+                };
                 const deleteReq = todoItemsOS.delete(this.id);
                 deleteReq.onsuccess = () => {
-                  return resolve();
+                  return resolve(deletedTask);
                 }
               });
               return resolve(deleteFromOS);
@@ -1267,7 +1387,7 @@ class ToDoItem {
   }
 
   static restore(taskId) {
-    // Handeling the argument
+    // Verify the argument
     if (typeof taskId !== 'string') {
       throw new TypeError('Invalid argument');
     }
@@ -1298,5 +1418,207 @@ class ToDoItem {
     });
 
     return restoreProcess;
+  }
+}
+
+function userSetting(command = 'check', targetValue) {
+  // Verify arguments
+  if (command !== 'check' && command !== 'autoArrange' && command !== 'timeFormat' && command !== 'todayArrange') {
+    throw new RangeError('Invalid command');
+  } else if ((command === 'autoArrange' && targetValue && typeof targetValue !== 'boolean')
+  || (command === 'timeFormat' && targetValue && targetValue !== 'mm:ss' && targetValue !== 'mm')) {
+    throw new RangeError(`Invalid value for ${command} command`);
+  }
+  // Verify object deeply
+  function verifyObject(object) {
+    if (object.constructor === Object) {
+      const objectEntries = Object.entries(object);
+      let key, value;
+      for([key, value] of objectEntries) {
+        const parsedKey = Number(key);
+        if (parsedKey > 0 && Number.isInteger(parsedKey)) {
+          if (value.constructor === Object) {
+            const valueKeys = Object.keys(value);
+            switch (true) {
+              case valueKeys.includes('pin') && typeof value.pin !== 'boolean':
+                throw new TypeError(`The value of pin in \"${key}\" object is not boolean`);
+              case valueKeys.includes('timer') && !Number(value.timer) > 0 && !Number.isInteger(value.timer):
+                throw new TypeError(`The value of timer in \"${key}\" object should be a non-negative number`);
+              case valueKeys.includes('order') && !Number(value.order) > 0 && !Number.isInteger(value.order):
+                throw new TypeError(`The value of order in \"${key}\" object should be a non-negative number`);
+              case valueKeys.includes('rootObject') && value.rootObject.constructor !== ToDoItem:
+                const rootObject = value.rootObject;
+                if (typeof rootObject.subject !== 'string' || rootObject.timer <= 0 || !Number.isInteger(rootObject.timer)
+                || typeof rootObject.pin !== 'boolean' || typeof rootObject.description !== 'string'
+                || rootObject.pattern.constructor !== Array
+                || !rootObject.pattern.every(weekday => Number.isInteger(weekday) && weekday <= 6 && weekday >= 0)
+                || rootObject.scheduledDays < 0 || !Number.isInteger(rootObject.scheduledDays) || typeof rootObject.startDate !== 'string'
+                || !new Date(rootObject.startDate).getTime() || !Number(rootObject.id) > 0) {
+                  throw new TypeError(`The root object in \"${key}\" object is invalid`);
+                }
+                break;
+              default:
+                if (!valueKeys.includes('pin') || !valueKeys.includes('timer') || !valueKeys.includes('order') || !valueKeys.includes('rootObject')) {
+                  throw new RangeError(`The \"${key}\" object is incomplete`);
+                }
+            }
+          } else {
+            throw new TypeError(`The value of \"${key}\" id is not an object`);
+          }
+        } else {
+          throw new TypeError(`\"${key}\" key is invalid to be an id`);
+        }
+      }
+      // Sync the orders with number of tasks
+      const sortedObjectEntriesByOrder = objectEntries.sort((aArray, bArray) => aArray[1].order - bArray[1].order);
+      const length = sortedObjectEntriesByOrder.length;
+      let i;
+      for (i = length - 1; i >= 0; i--) {
+        const taskId = sortedObjectEntriesByOrder[i][0];
+        object[taskId].order = i;
+      }
+    } else {
+      throw new TypeError(`Invalid value for ${command} command`);
+    }
+  }
+  // Main code
+  switch (command) {
+    case 'autoArrange':
+      if (targetValue) {
+        localStorage.setItem(command, targetValue);
+        return targetValue;
+      } else {
+        const autoArrange = localStorage.getItem(command);
+        if (autoArrange !== 'true' && autoArrange !== 'false') {
+          localStorage.setItem(command, false);
+          return false;
+        } else {
+          return JSON.parse(autoArrange);
+        }
+      }
+      break;
+    case 'timeFormat':
+      if (targetValue) {
+        localStorage.setItem(command, targetValue);
+        return targetValue;
+      } else {
+        const timeFormat = localStorage.getItem(command);
+        if (timeFormat !== 'mm' && timeFormat !== 'mm:ss') {
+          localStorage.setItem(command, 'mm');
+          return 'mm';
+        } else {
+          return timeFormat;
+        }
+      }
+      break;
+    case 'todayArrange':
+      if (targetValue) {
+        verifyObject(targetValue);
+        const objectJSON = JSON.stringify(targetValue);
+        localStorage.setItem(command, objectJSON);
+        return targetValue;
+      } else {
+        try {
+          const userArrange = JSON.parse(localStorage.getItem(command));
+          verifyObject(userArrange);
+          return userArrange;
+        } catch (exception) {
+          console.error(exception);
+          arrangeList(true);
+          throw exception;
+        }
+      }
+      break;
+    default:
+      /* Check the setting */
+      // Check the auto arrange value
+      const autoArrange = localStorage.getItem('autoArrange');
+      if (autoArrange !== 'false' && autoArrange !== 'true') {
+        localStorage.setItem('autoArrange', false);
+      }
+
+      // Check the time format value
+      const timeFormat = localStorage.getItem('timeFormat');
+      if (timeFormat !== 'mm' && timeFormat !== 'mm:ss') {
+        localStorage.setItem('timeFormat', 'mm');
+      }
+
+      // Check the last user check
+      const lastCheck = localStorage.getItem('lastCheck');
+      const lastCheckInMS = new Date(lastCheck).getTime();
+      const todayInMS = new Date(_Date('en-US')).getTime();
+      if (lastCheckInMS === todayInMS) {
+        try {
+          let todayArrange = userSetting('todayArrange');
+          todayArrange = Object.values(todayArrange);
+          todayArrange = todayArrange.sort((task1, task2) => task1.order - task2.order);
+          todayArrange = todayArrange.map(task => ToDoItem.restore(task.rootObject.id));
+          Promise.all(todayArrange).then(response => {
+            viewItems(response);
+          });
+        } catch (e) {
+          console.log(e);
+        }
+      } else {
+        Day.memorize();
+        Day.delete();
+        localStorage.setItem('lastCheck', _Date('en-US'));
+        arrangeList(true);
+      }
+  }
+}
+
+function sortTasks(task1, task2) {
+  let task1Pin, task1Order, task1Subject;
+  let task2Pin, task2Order, task2Subject;
+  if (isElement(task1) && isElement(task2)) {
+    task1Pin = task1.getAttribute('data-pin') === 'true' ? true : false;
+    task1Order = parseInt(getComputedStyle(task1).order);
+    task1Subject = task1.querySelector('p').innerText;
+    task2Pin = task2.getAttribute('data-pin') === 'true' ? true : false;
+    task2Order = parseInt(getComputedStyle(task2).order);
+    task2Subject = task2.querySelector('p').innerText;
+  } else {
+    task1Pin = task1.pin;
+    task1Order = 0;
+    task1Subject = task1.subject;
+    task2Pin = task2.pin;
+    task2Order = 0;
+    task2Subject = task2.subject;
+  }
+  switch (true) {
+    // Sort by pin value
+    case task1Pin === task2Pin:
+      // The pin values are the same, so we sort by order
+      if (task1Order < task2Order) {
+        return -1;
+      } else if (task1Order > task2Order) {
+        return 1;
+      } else {
+        // The orders are the same, so we sort by name
+        if (task1Subject < task2Subject) {
+          return -1;
+        } else if (task1Subject > task2Subject) {
+          return 1;
+        } else {
+          // The names are the same, so we sort by id
+          if (task1.id < task2.id) {
+            return -1;
+          } else if (task1.id > task2.id) {
+            return 1;
+          } else {
+            // This condition is almost impossible
+            return 0;
+          }
+        }
+      }
+      break;
+    case task1Pin:
+      return -1;
+    case task2Pin:
+      return 1;
+    default:
+      console.log(task1Pin, task2Pin);
+      throw new Error('Unexpected error!');
   }
 }
