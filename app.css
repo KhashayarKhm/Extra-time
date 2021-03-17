@@ -1,33 +1,322 @@
-/* styles for 'moveSection' function */
+.flip .flip-env-inner {
+  /* This style is for "flip-env" class */
+  transform: rotateY(180deg);
+}
+
+.single-content-mode {
+  /* This style is for "todo-list" class */
+  grid-template-rows: max-content;
+}
+
+/* styles for "moveSection" function */
 .moveSection-prevElement {
-  position: absolute !important;
-  -webkit-transform: translate(0, -100vh) !important;
-  transform: translate(0, -100vh) !important;
+  position: absolute;
+  -webkit-transform: translate(0, -100vh);
+  transform: translate(0, -100vh);
 }
 
 .moveSection-prevElement-left {
-  position: absolute !important;
-  -webkit-transform: translate(-100vw, -100vh) !important;
-  transform: translate(-100vw, -100vh) !important;
+  position: absolute;
+  -webkit-transform: translate(-100vw, -100vh);
+  transform: translate(-100vw, -100vh);
 }
 
 .moveSection-prevElement-right {
-  position: absolute !important;
-  -webkit-transform: translate(100vw, -100vh) !important;
-  transform: translate(100vw, -100vh) !important;
+  position: absolute;
+  -webkit-transform: translate(100vw, -100vh);
+  transform: translate(100vw, -100vh);
 }
 
 .moveSection-nextElement {
-  -webkit-transform: translateX(0) !important;
-  transform: translateX(0) !important;
+  -webkit-transform: translateX(0);
+  transform: translateX(0);
 }
 
 .moveSection-nextElement-left {
-  -webkit-transform: translateX(-100vw) !important;
-  transform: translateX(-100vw) !important;
+  -webkit-transform: translateX(-100vw);
+  transform: translateX(-100vw);
 }
 
 .moveSection-nextElement-right {
-  -webkit-transform: translateX(100vw) !important;
-  transform: translateX(100vw) !important;
+  -webkit-transform: translateX(100vw);
+  transform: translateX(100vw);
+}
+
+/* Styles for "navigateUp" and "navigateDown" functions */
+.navigateUp {
+  -webkit-transform: translateY(-100%);
+  transform: translateY(-100%);
+}
+
+.navigateDown {
+  -webkit-transform: translateY(100%);
+  transform: translateY(100%);
+}
+
+/* Styles for "viewItems" function */
+.viewItems-fade {
+  opacity: 0;
+  -webkit-transform: translateY(-20%);
+  transform: translateY(-20%);
+}
+
+.viewItems-show {
+  opacity: 1;
+  -webkit-transform: none;
+  transform: none;
+}
+
+.nothing-to-do {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  justify-self: center;
+}
+
+.nothing-to-do img {
+  width: 15rem;
+  height: 15rem;
+}
+
+/* Styles for "arrangeList" function */
+.arrangeList, .viewPlan {
+  /* This style is shared between "arrangeList" and "viewPlan" functions */
+  width: 100%;
+  height: 100%;
+  background-color: #F3BC02;
+  border-radius: .9375em;
+  display: grid;
+  grid-template-columns: 40% 40%;
+  grid-column-gap: 20%;
+  grid-template-rows: 13% 12% repeat(auto-fill, 16%);
+  grid-row-gap: 3%;
+  align-items: center;
+  overflow-y: scroll;
+  -webkit-transition: .8s;
+  transition: .8s;
+}
+
+.arrangeList .icon {
+  height: 1.2rem;
+  width: 1.2rem;
+}
+
+.arrangeList .icon path {
+  stroke: #CFD8D7;
+}
+
+.arrangeList-header, .viewPlan-header {
+  /* This style is shared between "arrangeList" and "viewPlan" functions */
+  margin: 0;
+  grid-column-start: 1;
+  grid-column-end: 3;
+  justify-self: center;
+}
+
+.arrangeList > .submit-button-env, .viewPlan > .viewPlan-searchBox {
+  /* This style is shared between "arrangeList" and "viewPlan" functions */
+  grid-column-start: 1;
+  grid-column-end: 3;
+  justify-self: center;
+  display: flex;
+  width: 100%;
+  justify-content: center;
+}
+
+.arrangeList > .submit-button-env.dark-kit button {
+  padding: 2% 20%;
+}
+
+.arrangeList-task {
+  padding: 1%;
+  width: 90%;
+  height: 3.2rem;
+  display: grid;
+  align-items: center;
+  grid-template-columns: 40% 40% 20%;
+  grid-template-rows: 50% 50%;
+  border-radius: .9375em;
+  background-color: #1A2E38;
+  color: #CFD8D7;
+  justify-self: center;
+  grid-column-start: 1;
+  grid-column-end: 3;
+  -webkit-transition: .8s;
+  transition: .8s;
+}
+
+.arrangeList button[name = "pin"] {
+  grid-column-start: 2;
+  grid-column-end: 3;
+  grid-row-start: 2;
+  grid-row-end: 3;
+  justify-self: center;
+  height: auto;
+  width: auto;
+  -webkit-transition: .8s;
+  transition: .8s;
+}
+
+.arrangeList-navigate {
+  display: grid;
+  width: 60%;
+  height: 3rem;
+  grid-template-rows: 50% 50%;
+  grid-row-gap: 10%;
+  align-self: start;
+  justify-self: end;
+  grid-column-start: 3;
+  grid-column-end: 4;
+  grid-row-start: 1;
+  grid-row-end: 3;
+}
+
+.arrangeList-navigate button {
+  height: 70%;
+  width: auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.arrangeList-navigate .icon {
+  height: 1rem;
+  width: 1rem;
+}
+
+.arrangeList .remaining-time {
+  grid-column-start: 1;
+  grid-column-end: 2;
+  grid-row-start: 2;
+  grid-row-end: 3;
+  justify-self: end;
+}
+
+.arrangeList .pin path {
+  fill: #CFD8D7;
+}
+
+.arrangeList-info {
+  position: fixed;
+  top: 46%;
+  left: 22.6%;
+  height: 30%;
+  width: 70%;
+  text-align: center;
+  background-color: #E76166;
+  border-radius: .9375em;
+  z-index: 1;
+  -webkit-transition: .8s;
+  transition: .8s;
+}
+
+.arrangeList-info-active {
+  z-index: 2;
+}
+
+.arrangeList-info-active circle {
+  fill: #E76166;
+}
+
+.arrangeList-info-active text {
+  fill: #1A2E38;
+}
+
+/* Styles for "viewPlan" function */
+.viewPlan {
+  background-color: #CFD8D7;
+  grid-template-columns: 50% 50%;
+  grid-column-gap: 0;
+  grid-template-rows: 13% 12% repeat(16, 7em);
+  justify-items: center;
+  align-items: center;
+}
+
+.viewPlan > .searchBox {
+  grid-column-start: 1;
+  grid-column-end: 3;
+  display: flex;
+  justify-content: center;
+}
+
+.viewPlan > .searchBox > .datePick {
+  display: flex;
+  width: 9em;
+  height: 2em;
+  align-items: center;
+  justify-content: center;
+  background-color: #E76166;
+  border: 0.0625em solid #1A2E38;
+  -webkit-transition: .3s;
+  transition: .3s;
+  border-radius: 0.3125em 0 0 0.3125em;
+  border-right: none;
+}
+
+.viewPlan > .searchBox > .datePick > input {
+  width: 2.1em;
+  text-align: center;
+  border: none;
+  background-color: transparent;
+}
+
+.viewPlan > .searchBox > .datePick > input[name = "year"] {
+  width: 3em;
+}
+
+.viewPlan > .searchBox > .datePick.focus {
+  background-color: #1A2E38;
+  color: #E76166;
+  border-color: #E76166;
+}
+
+.viewPlan > .searchBox > .datePick > input:invalid,
+.viewPlan > .searchBox > .datePick > input.warning {
+  animation: warning 3s ease-in-out 0s infinite;
+}
+
+.viewPlan > .searchBox > .datePick.focus > input {
+  background-color: transparent;
+  color: #E76166;
+}
+
+.viewPlan > .searchBox > button {
+  border-radius: 0 0.3125em 0.3125em 0;
+  border-left: none;
+  width: 3em;
+}
+
+.viewPlan > .item {
+  animation: view-type1 .3s ease-in-out;
+  width: 7em;
+  height: 6em;
+  background-color: #1A2E38;
+  border-radius: .9375em;
+  color: #E76166;
+  display: grid;
+  grid-template-rows: 25% 5% 40%;
+  grid-row-gap: 5%;
+  align-items: center;
+  justify-items: center;
+}
+
+.viewPlan > .item > p.viewPlan-header {
+  font-size: .8em;
+}
+
+.viewPlan > .item > .label {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.viewPlan > .item > .label > .icon {
+  margin: 0 .05em;
+  width: 1em;
+  height: 1em;
+}
+
+.viewPlan > .item > .label > .icon > path {
+  stroke: #E76166;
 }
