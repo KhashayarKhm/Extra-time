@@ -232,24 +232,36 @@ svg.icon.pin * {
   fill: #CFD8D7;
 }
 
+svg.icon[data-them = "dark"] * {
+  stroke: #1A2E38;
+}
+
 svg.icon.full[data-them = "dark"] * {
   fill: #1A2E38;
-  stroke: #1A2E38;
+}
+
+svg.icon[data-them = "red"] * {
+  stroke: #E76166;
 }
 
 svg.icon.full[data-them = "red"] * {
   fill: #E76166;
-  stroke: #E76166;
+}
+
+svg.icon[data-them = "yellow"] * {
+  stroke: #F3BC02;
 }
 
 svg.icon.full[data-them = "yellow"] * {
   fill: #F3BC02;
-  stroke: #F3BC02;
+}
+
+svg.icon[data-them = "white"] * {
+  stroke: #CFD8D7;
 }
 
 svg.icon.full[data-them = "white"] * {
   fill: #CFD8D7;
-  stroke: #CFD8D7;
 }
 
 button[data-them = "dark"] > span:first-child:only-of-type, button[data-them = "yellow"] > span:first-child:only-of-type,
