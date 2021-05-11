@@ -320,3 +320,28 @@
 .viewPlan > .item > .label > .icon > path {
   stroke: #E76166;
 }
+
+/* Styles for "determineTaskStatus" function */
+.message.remove-task > .undefinedTaskStatus {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  width: 80%;
+  background-color: #1A2E38;
+  border: .0625em solid #F3BC02;
+  border-radius: .3125em;
+  color: #F3BC02;
+  -webkit-transition: .3s;
+  transition: .3s;
+}
+
+.message.remove-task > .undefinedTaskStatus > svg.icon {
+  width: 1em;
+  height: 1em;
+}
+
+.message.remove-task > .undefinedTaskStatus.done {
+  background-color: #F3BC02;
+  color: #1A2E38;
+  border-color: #1A2E38;
+}
