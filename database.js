@@ -330,13 +330,15 @@ class Day {
     } else if (date) {
       if (!new Date(date).getTime()) {
         throw new RangeError('Invalid date');
-      } else {
+      }
+      // WARNING: inja moqeii gir mindaze k bd chnd roz azt soal mikne k kodom kar ro anjam ddi
+      /* else {
         const _date = new Date(date).getTime();
         const now = new Date(_Date('en-US')).getTime();
         if (_date < now) {
-          throw new RangeError('This date is over');
+          throw new RangeError('This date is expired');
         }
-      }
+      }*/
     }
     // Set property and add it to database or restore it automaticly
     date = date ? date.replace(/[-]/g, '/') : _Date('en-US');
@@ -551,7 +553,7 @@ class Day {
     }
     const targetDate = new Date(this.date).getTime();
     const now = new Date(_Date('en-US')).getTime();
-    if (targetDate !== now) {
+    if (targetDate > now) {
       throw new RangeError('This function can not execute for this date');
     }
     // Main code
@@ -619,7 +621,7 @@ class Day {
     }
     const targetDate = new Date(this.date).getTime();
     const now = new Date(_Date('en-US')).getTime();
-    if (targetDate !== now) {
+    if (targetDate > now) {
       throw new RangeError('This function can not execute for this date');
     }
     // Main code
@@ -685,34 +687,52 @@ class Day {
     return doneTaskProcess;
   }
 
-  static async delete() {
+  // WARNING: in function momkne drst kar nkne
+  static delete() {
     // Main code
-    const databaseReq = await window.indexedDB.open('todo_db', 1);
-    let database;
-    databaseReq.onsuccess = event => {
-      database = event.target.result;
-    };
-    const transaction = await database.transaction(['spent_week'], 'readwrite');
-    const spentWeekOS = transaction.objectStore('spent_week');
-    /* QUESTION: toy cursor 'next' az hmon akhr khodmon miad ya 'prev'?
-    age 'next' az akhr shoro mish byd vas hme cursor haro avz krd */
-    // Searching for dates in daysAheadOS that spent a week or more to delete them
-    const originDate = calculateFewDaysBeforeOrAfter(7, 'before');
-    const cursorReq = spentWeekOS.openCursor();
-    cursorReq.onsuccess = event => {
-      cursor = event.target.result;
-      if (cursor) {
-        const record = cursor.value;
-        if (new Date(record).getTime() <= new Date(originDate).getTime()) {
-          const removeReq = spentWeekOS.delete(record.date);
-          removeReq.onsuccess = () => {
+    const deleteProcess = new Promise((resolve, reject) => {
+      const objectStoreReq = getOS(['spent_week']);
+      objectStoreReq.then(response => {
+        return Promise.resolve(response);
+      });
+      resolve(objectStoreReq);
+    }).then(objectStore => {
+      const spentWeekOS = objectStore[0];
+      const originDate = calculateFewDaysBeforeOrAfter(7, 'before');
+      const removeRequests = [];
+      const cursorProcess = new Promise((resolve, reject) => {
+        const cursorReq = spentWeekOS.openCursor();
+        cursorReq.onsuccess = event => {
+          const cursor = event.target.result;
+          if (cursor) {
+            const record = cursor.value;
+            if (new Date(record.date).getTime() > new Date(originDate).getTime()) {
+              const removeProcess = new Promise((resolve, reject) => {
+                const removeReq = spentWeekOS.delete(record.date);
+                removeReq.onsuccess = () => {
+                  return resolve();
+                };
+              });
+              removeRequests.push(removeProcess);
+            }
             cursor.continue();
+          } else {
+            if (removeRequests.length === 0) {
+              const requestsResults = Promise.all(removeRequests);
+              requestsResults.then(responses => {
+                return Promise.resolve(responses);
+              });
+              return resolve(requestsResults);
+            } else {
+              return resolve();
+            }
           }
-        } else {
-          cursor.continue();
-        }
-      }
-    };
+        };
+      });
+      return Promise.resolve(cursorProcess);
+    });
+
+    return deleteProcess;
   }
 
   static memorize() {
@@ -762,7 +782,7 @@ class Day {
             }
           };
         });
-        resolve(cursorProcess);
+        Promise.resolve(cursorProcess);
       }).then(spentDatesObj => {
         // Modify the objects and preparing for add them to spent_week object store
         spentDatesObj = spentDatesObj.map(obj => {
@@ -963,6 +983,8 @@ class ToDoItem {
         resolve(objectStoreReq);
       }).then(objectStore => {
         // Initialize the todo item id
+        /* FIXME: id automatic hstsh (mizon knmsh)
+        - ye moshkli has une k id ro ndrim onvqt va byd az db grft (hla bbinm moqeii k ad miknim b ma object ro return mikne ya n) */
         const uniqueId = (Math.random() * 100).toFixed();
         this.id = uniqueId;
         const todoItemsOS = objectStore[0];
@@ -1040,251 +1062,312 @@ class ToDoItem {
     }
   }
 
-  async edit(properties, values) {
-    // Handeling arguments
+  // WARNING: in function momkne drst kar nkne
+  edit(properties) {
+    // Verify argument
     switch (true) {
-      case !properties instanceof Array:
-        throw new TypeError(`${properties} is invalid argument`);
-      case !values instanceof Array:
-        throw new TypeError(`${values} is invalid argument`);
-      case properties.length >= 6 && values.length === 0:
-      case values.length >= 6 && values.length === 0:
-      case properties.length !== values.length:
-        throw new RangeError('Invalid arrays length');
-      }
-      properties = removeDuplicateValue(properties);
-      let i;
-      const length = properties.length;
-      for (i = 0; i < length; i++) {
-        switch (properties[i]) {
-          case 'subject':
-            if (typeof values[i] !== 'string') {
-              throw new TypeError(`${values[i]} is invalid for ${properties[i]}`);
-            }
-            break;
-          case 'scheduledDays':
-            if (typeof values[i] !== 'number') {
-              throw new TypeError(`${values[i]} is invalid for ${properties[i]}`);
-            } else if (values[i] < 0 || !Number.isInteger(values[i])) {
-              throw new RangeError('radix must be an integer and non-negative');
-            }
-            break;
-          case 'timer':
-            if (typeof values[i] !== 'number') {
-              throw new TypeError(`${values[i]} is invalid for ${properties[i]}`);
-            } else if (values[i] <= 0 || !Number.isInteger(values[i])) {
-              throw new RangeError('radix must be an integer and non-negative and non-zero');
-            }
-            break;
-          case 'pin':
-            if (typeof values[i] !== 'boolean') {
-              throw new TypeError(`${values[i]} is invalid for ${properties[i]}`);
-            }
-            break;
-          case 'description':
-            if (typeof values[i] !== 'string') {
-              throw new TypeError(`${values[i]} is invalid for ${properties[i]}`);
-            }
-            break;
-          case 'pattern':
-            if (values[i] instanceof Array) {
-              const patternValues = values[i];
-              if (patternValues.length < 7 || patternValues.length !== 0) {
-                const validValue = patternValues.every()(item => {
-                  return Number.isInteger(item) && item <= 6 && item >= 0;
-                });
-                if (validValue) {
-                  patternValues = patternValues.sort();
-                  patternValues = removeDuplicateValue(patternValues);
+      case properties.constructor !== Object:
+        throw new TypeError('\"properties\" is invalid argument');
+      default:
+        // Verify the object properties and its values
+        let property, value;
+        const objEnt = Object.entries(properties);
+        for([property, value] of objEnt) {
+          switch (property) {
+            case 'subject':
+              if (typeof value !== 'string') {
+                throw new TypeError(`${value} is invalid value for ${property} property`);
+              }
+              break;
+            case 'scheduledDays':
+              if (typeof value !== 'number') {
+                throw new TypeError(`${value} is invalid value for ${property} property`);
+              } else if (value < 0 || !Number.isInteger(value)) {
+                throw new RangeError('radix must be an integer and non-negative');
+              }
+              break;
+            case 'timer':
+              if (typeof value !== 'number') {
+                throw new TypeError(`${value} is invalid value for ${property} property`);
+              } else if (value <= 0 || !Number.isInteger(value)) {
+                throw new RangeError('radix must be an integer and non-negative and non-zero');
+              }
+              break;
+            case 'pin':
+              if (typeof value !== 'boolean') {
+                throw new TypeError(`${value} is invalid value for ${property} property`);
+              }
+              break;
+            case 'description':
+              if (typeof value !== 'string') {
+                throw new TypeError(`${value} is invalid value for ${property} property`);
+              }
+              break;
+            case 'startDate':
+              if (typeof value !== 'string') {
+                throw new TypeError(`${value} is invalid value for ${property} property`);
+              } else if (!new Date(value)) {
+                throw new RangeError('Invalid date');
+              } else {
+                const todayTime = new Date().getTime();
+                const startDateTime = new Date(value).getTime();
+                if (todayTime > startDateTime) {
+                  throw new RangeError(`${value} has expired`);
+                }
+              }
+              break;
+            case 'pattern':
+              if (value instanceof Array) {
+                const patternValues = value;
+                if (patternValues.length < 7 || patternValues.length !== 0) {
+                  const validValue = patternValues.every(item => {
+                    return Number.isInteger(item) && item <= 6 && item >= 0;
+                  });
+                  if (validValue) {
+                    patternValues = patternValues.sort();
+                    value = removeDuplicateValue(patternValues);
+                  } else {
+                    throw new TypeError(`${patternValues} is invalid value for pattern`);
+                  }
                 } else {
-                  throw new TypeError(`${patternValues} is invalid value for pattern`);
+                  throw new RangeError('Invalid array length for pattern');
                 }
               } else {
-                throw new RangeError('Invalid array length for pattern');
+                throw new TypeError(`${value} is invalid value for ${property} property`);
               }
-            } else {
-              throw new TypeError(`${values[i]} is invalid for ${properties[i]}`);
-            }
-            break;
-          default:
-            throw new TypeError(`${properties[i]} is invalid property`);
-        }
-      }
-    // Main code
-    const request = await window.indexedDB.open('todo_db', 1);
-    let database;
-    request.onsuccess = event => {
-      database = event.target.result;
-    };
-    const updatedTask = this;
-    const unchangedTask = this;
-    const daysAheadTransaction = await database.transaction(['days_ahead'], 'readwrite');
-    const daysAheadOS = daysAheadTransaction.objectStore('days_ahead').index('weekday');
-    const todoItemTransaction = database.transaction(['todo_items'], 'readwrite');
-    const todoItemsOS = todoItemTransaction.objectStore('todo_items');
-    for (i = 0; i < length; i++) {
-      switch (properties[i]) {
-        case 'subject':
-          updatedTask.subject = values[i];
-          break;
-        case 'scheduledDays':
-          if (unchangedTask.scheduledDays > values[i]) {
-            const length = updatedTask.pattern.length;
-            let j = 0, overplus = unchangedTask.scheduledDays - values[i], overplusToken;
-            do {
-              if (j >= length) {
-                break;
-              }
-              overplusToken = overplus / (length - j);
-              j++;
-            } while (!Number.isInteger(overplusToken));
-            // WARNING: inja ye check knm age roy index miad pas fk knm byd yki dige hm km krd
-            let exceptionToken = length - j - 1;
-            const pattern = updatedTask.pattern.reverse();
-            for (j = 0; j <  length; j++) {
-              const cursorReq = daysAheadOS.openCursor(pattern[j], 'prev');
-              let et = exceptionToken > 0 ? 1 : 0;
-              cursorReq.onsuccess = event => {
-                let ot = overplusToken;
-                const cursor = event.target.result;
-                if (cursor && (ot + et)) {
-                  let targetDay = cursor.value;
-                  if (targetDay.tasks.includes(updatedTask.id)) {
-                    targetDay.tasks = targetDay.tasks.filter(taskId => {
-                      return taskId !== updatedTask.id;
-                    });
-                    const updateReq = cursor.update(targetDay);
-                    updateReq.onsuccess = () => {
-                      ot--;
-                      cursor.continue();
-                    };
-                    exceptionToken--;
-                  }
-                }
-              };
-            }
-          } else if (unchangedTask.scheduledDays < values[i]) {
-            const length = updatedTask.pattern.length;
-            let j = 0, overplus = values[i] - unchangedTask.scheduledDays, overplusToken;
-            do {
-              if (j >= length) {
-                break;
-              }
-              overplusToken = overplus / (length - j);
-              j++;
-            } while (!Number.isInteger(overplusToken));
-            // WARNING: inja ye check knm age roy index miad pas fk knm byd yki dige hm km krd
-            let exceptionToken = length - j -1;
-            for (j = 0; j < length; j++) {
-              const cursorReq = daysAheadOS.openCursor(updatedTask.pattern[j]);
-              let et = exceptionToken > 0 ? 1 : 0;
-              cursorReq.onsuccess = event => {
-                let ot = overplusToken;
-                const cursor = event.target.result;
-                if (cursor && (ot + et)) {
-                  let targetDay = cursor.value;
-                  if (!targetDay.tasks.includes(updatedTask.id)) {
-                    targetDay.tasks.push(updatedTask.id);
-                    const updateReq = cursor.update(targetDay);
-                    updateReq.onsuccess = () => {
-                      ot--;
-                      cursor.continue();
-                    };
-                    exceptionToken--;
-                  }
-                }
-              };
-            }
-          }
-          // Modify the scheduledDays
-          updatedTask.scheduledDays = values[i];
-          break;
-        case 'timer':
-          updatedTask.timer = values[i];
-          break;
-        case 'pin':
-          updatedTask.pin = values[i];
-          break;
-        case 'description':
-          updatedTask.description = values[i];
-          break;
-        case 'pattern':
-          const oldPattern = unchangedTask.pattern;
-          const newPattern = values[i].sort();
-          let deletePattern = oldPattern, addPattern = newPattern, j;
-          let length = newPattern.length >= oldPattern.length ? newPattern.length : oldPattern.length;
-          for (j = 0; j < length; j++) {
-            if (oldPattern[j]) {
-              const value = oldPattern[j];
-              addPattern = addPattern.filter(item => {
-                return value !== item;
-              });
-            }
-            if (newPattern[j]) {
-              const value = newPattern[j];
-              deletePattern = deletePattern.filter(item => {
-                return value !== item;
-              });
-            }
-          }
-          length = deletePattern.length;
-          for (j = 0; j < length; j++) {
-            const cursorReq = daysAheadOS.openCursor(deletePattern[j]);
-            cursorReq.onsuccess = event => {
-              const cursor = event.target.result;
-              if (cursor) {
-                let targetDay = cursor.value;
-                if (targetDay.tasks.includes(updatedTask.id)) {
-                  targetDay.tasks = targetDay.tasks.filter(taskId => {
-                    return taskId !== updatedTask.id;
-                  });
-                  const updateReq = cursor.update(targetDay);
-                  updateReq.onsuccess = () => {
-                    cursor.continue();
-                  };
-                }
-              }
-            };
-          }
-
-          let weekdaysToken;
-          length = addPattern.length;
-          j = 0;
-          do {
-            if (j >= length) {
               break;
-            }
-            weekdaysToken = updatedTask.scheduledDays / (length - j);
-            j++;
-          } while (!Number.isInteger(weekdaysToken));
-          // WARNING: inja ye check knm age roy index miad pas fk knm byd yki dige hm km krd
-          // TODO: ino bdn test knm k ba ye -1 ok mish ya n
-          let exceptionToken = length - j - 1;
-          for (j = 0; j < length; j++) {
-            const cursorReq = daysAheadOS.openCursor(addPattern[j]);
-            let et = exceptionToken > 0 ? 1 : 0;
-            cursorReq.onsuccess = event => {
-              let wt = weekdaysToken;
-              const cursor = event.target.result;
-              if (cursor && (wt + et)) {
-                const targetDay = cursor.value;
-                targetDay.tasks.push(updatedTask.id);
-                const updateReq = cursor.update(targetDay);
-                updateReq.onsuccess = () => {
-                  wt--;
-                  cursor.continue();
-                };
-                exceptionToken--;
+            default:
+              if (property === 'id' || property === 'remainedDays') {
+                throw new TypeError(`\"${property}\" is read-only`);
+              } else {
+                throw new TypeError(`Can not modify the property, \"${property}\" is undefined`);
               }
-            };
           }
-          // Modify the pattern
-          updatedTask.pattern = newPattern;
-          break;
-        default:
-          throw new TypeError(`${properties[i]} is invalid property`);
-      }
+        }
+        // Verify the startDate value
+        const startDateWeekday = new Date(properties.startDate).getDay();
+        if ((properties.pattern || this.pattern).includes(startDateWeekday)) {
+          throw new RangeError(`${properties.startDate} can not match with the weekday pattern`);
+        }
     }
+    // Main code
+    const editProcess = new Promise((resolve, reject) => {
+      const objectStoreReq = getOS(['todo_items']);
+      objectStoreReq.then(response => {
+        return Promise.resolve(response);
+      });
+      resolve(objectStoreReq);
+    }).then(objectStore => {
+      const todoItemsOS = objectStore[0];
+      const modifyRequests = [];
+      // This block of code is just for modify the subject, timer, pin and description properties
+      if (properties.subject || properties.timer || properties.pin || properties.description) {
+        const modifyProperties = new Promise((resolve, reject) => {
+          const cursorReq = todoItemsOS.openCursor(this.id);
+          cursorReq.onsuccess = event => {
+            const cursor = event.target.result;
+            resolve(cursor);
+          };
+        }).then(cursor => {
+          const updateProcess = new Promise((resolve, reject) => {
+            const targetTask = cursor.value;
+            targetTask.subject = properties.subject ? properties.subject : targetTask.subject;
+            targetTask.timer = properties.timer ? properties.timer : targetTask.timer;
+            targetTask.pin = properties.pin ? properties.pin : targetTask.pin;
+            targetTask.description = properties.description ? properties.description : targetTask.description;
+            const updateReq = cursor.update(targetTask);
+            updateReq.onsuccess = event => {
+              console.log(event.target);
+              return resolve();
+            };
+          });
+          return Promise.resolve(updateProcess);
+        });
+
+        modifyRequests.push(modifyProperties);
+      }
+
+      // This block of code is just for scheduling
+      if (properties.scheduledDays || properties.pattern || properties.startDate) {
+        const modifySchedule = new Promise((resolve, reject) => {
+          const cursorReq = todoItemsOS.openCursor(this.id);
+          cursorReq.onsuccess = event => {
+            const cursor = event.target.result;
+            resolve(cursor);
+          }
+        }).then(cursor => {
+          const targetTask = cursor.value;
+          // Calculate the origin date
+          let originDate;
+          switch (true) {
+            // Convert to boolean
+            case !!properties.startDate:
+              // User wants to modify the startDate
+              originDate = properties.startDate;
+              break;
+            case (new Date(targetTask.startDate).getTime() >= new Date().getTime()):
+              // The start date is ahead from today
+              originDate = targetTask.startDate;
+              break;
+            case (properties.pattern || targetTask.pattern).includes(new Date().getDay()):
+              // Today is in weekday pattern so it can be the origin date
+              originDate = _Date('en-US');
+              break;
+            default:
+              const todayWeekday = new Date().getDay();
+              const pattern = properties.pattern || targetTask.pattern;
+              const originWeekday = pattern.find(weekday => weekday > todayWeekday);
+              /* The interval between today and the start date
+              the condition means that there is not any weekday number bigger then today weekday number
+              so the start date weekday number is the first element of the pattern cause it is next */
+              const interval = originWeekday === -1 ? (7 - todayWeekday) + pattern[0] : originWeekday - todayWeekday;
+              originDate = calculateFewDaysBeforeOrAfter(interval, 'after');
+          }
+          // Check for scheduling with new pattern, start date or not
+          if (properties.pattern || properties.startDate) {
+            /* When the pattern or strat date of an item changed, the nature of the item change,
+            so we create new task with new id and properties */
+            const transformProcess = new Promise((resolve, reject) => {
+              const deleteProcess = new Promise((resolve, reject) => {
+                const deleteTask = this.delete();
+                return resolve(deleteTask);
+              });
+              resolve(deleteItem);
+            }).then(deletedTask => {
+              const addProcess = new Promise((resolve, reject) => {
+                const addTask = new ToDoItem(properties.subject ? properties.subject : deletedTask.subject,
+                  properties.timer ? properties.timer : deletedTask.timer,
+                  properties.scheduledDays ? properties.scheduledDays : deletedTask.scheduledDays,
+                  properties.pattern ? properties.pattern : deletedTask.pattern,
+                  originDate,
+                  properties.pin ? properties.pin : deletedTask.pin,
+                  properties.description ? properties.description : deletedTask.description);
+                return resolve(addTask);
+              });
+              return Promise.resolve(addProcess);
+            });
+            return Promise.resolve(transformProcess);
+          } else {
+            // Just modify the "scheduledDays" property
+            const requests = [];
+            const originWeekday = new Date(originDate).getDay();
+            const patternPart1 = this.pattern.filter(element => element >= originWeekday);
+            const patternPart2 = this.pattern.filter(element => element < originWeekday);
+            const pattern = [...patternPart1, ...patternPart2];
+            const wt = parseInt(targetTask.scheduledDays / pattern.length);
+            const sdt = targetTask.scheduledDays % pattern.length;
+            // Interval to last date of the task
+            const intervalToLastTask = wt + sdt;
+            const lastDate = calculateFewDaysBeforeOrAfter(intervalToLastTask, 'after', 'en-US', originDate);
+            const flagDates = new Array(targetTask.pattern.length);
+            let overplus = properties.scheduledDays - targetTask.scheduledDays;
+            function modification(action, targetTaskID, targetDate) {
+              if (action !== 'add' && action !== 'delete') {
+                throw new TypeError('Invalid action');
+              } else if (typeof targetTaskID !== 'string') {
+                throw new TypeError('Invalid id');
+              } else if (!new Date(targetDate)) {
+                throw new TypeError('Invalid date');
+              }
+              const mProcess = new Promise((resolve, reject) => {
+                const objectStoreReq = getOS(['days_ahead']);
+                objectStoreReq.then(response => {
+                  return resolve(response);
+                });
+                resolve(objectStoreReq);
+              }).then(objectStore => {
+                const daysAheadOS = objectStore[0];
+                const cursorProcess = new Promise((resolve, reject) => {
+                  const cursorReq = daysAheadOS.openCursor(targetDate);
+                  cursorReq.onsuccess = event => {
+                    const cursor = event.target.result;
+                    resolve(cursor);
+                  };
+                }).then(cursor => {
+                  if (cursor) {
+                    const process = new Promise((resolve, reject) => {
+                      const _targetDate = cursor.value;
+                      if (action === 'add') {
+                        _targetDate.tasks.push(targetTaskID);
+                      } else {
+                        _targetDate.tasks = _targetDate.tasks.filter(task => task !== targetTaskID);
+                      }
+                      const addReq = cursor.update(_targetDate);
+                      addReq.onsuccess = () => {
+                        return resolve(_targetDate);
+                      };
+                    });
+                    return Promise.resolve(process);
+                  } else {
+                    // Target date does not exist, so we should create one and try again
+                    const retryTheProcess = new Promise((resolve, reject) => {
+                      const initTheDate = new Day(targetDate);
+                      resolve(initTheDate);
+                    }).then(targetDateObj => {
+                      // "rtp" stands for "Retry The Process"
+                      const rtp = modification(action, targetTaskID, targetDate);
+                      return Promise.resolve(rtp);
+                    });
+                    return Promise.resolve(retryTheProcess);
+                  }
+                });
+                return Promise.resolve(cursorProcess);
+              });
+              return mProcess;
+            }
+            if (overplus > 0) {
+              // So the new scheduledDays is more than the older one
+              let i, j;
+              for (i = 0, j = 0; i < overplus; i++, j++) {
+                j = j >= pattern.length ? 0 : j;
+                let calculatedDate;
+                if (flagDates[j]) {
+                  calculatedDate = calculateFewDaysBeforeOrAfter(7, 'after', 'en-US', flagDates[j]);
+                } else {
+                  const interval = pattern[0] - pattern[j] > 0 ? pattern[0] - pattern[j] : (7 - pattern[0]) + pattern[j];
+                  calculatedDate = calculateFewDaysBeforeOrAfter(interval, 'after', 'en-US', targetTask.startDate);
+                  flagDates[j] = calculatedDate;
+                }
+                 const request = modification('add', this.id, calculatedDate);
+                 requests.push(request);
+              }
+            } else if (overplus < 0) {
+              // So the new scheduledDays is less than the older one
+              overplus = Math.abs(overplus);
+              let i, j;
+              for (i = 0, j = 0; i < overplus; i++, j++) {
+                j = j >= pattern.length ? 0 : j;
+                let calculatedDate;
+                if (flagDates[j]) {
+                  calculatedDate = calculateFewDaysBeforeOrAfter(7, 'before', 'en-US', flagDates[j]);
+                } else {
+                  const interval = pattern[0] - pattern[j] > 0 ? pattern[0] - pattern[j] : (7 - pattern[j]) + pattern[0];
+                  calculatedDate = calculateFewDaysBeforeOrAfter(interval, 'before', 'en-US', targetTask.startDate);
+                  flagDates[j] = calculatedDate;
+                }
+                const request = modification('delete', this.id, calculatedDate);
+                requests.push(request);
+              }
+            }
+            const requestsResults = Promise.all(requests);
+            requestsResults.then(responses => {
+              return Promise.resolve(responses);
+            });
+            return Promise.resolve(requestsResults);
+          }
+        });
+
+        modifyRequests.push(modifySchedule);
+      }
+
+      const modificationProcess = Promise.all(modifyRequests);
+      modificationProcess.then(responses => {
+        return Promise.resolve(responses);
+      });
+      return Promise.resolve(modificationProcess);
+    });
+
+    return editProcess;
   }
 
   delete() {
@@ -1544,10 +1627,10 @@ function userSetting(command = 'check', targetValue) {
       }
 
       // Check the last user check
-      const lastCheck = localStorage.getItem('lastCheck');
-      const lastCheckInMS = new Date(lastCheck).getTime();
+      const lastSeen = localStorage.getItem('lastSeen');
+      const lastSeenInMS = new Date(lastSeen).getTime();
       const todayInMS = new Date(_Date('en-US')).getTime();
-      if (lastCheckInMS === todayInMS) {
+      if (lastSeenInMS === todayInMS) {
         try {
           let todayArrange = userSetting('todayArrange');
           todayArrange = Object.values(todayArrange);
@@ -1560,10 +1643,15 @@ function userSetting(command = 'check', targetValue) {
           console.log(e);
         }
       } else {
-        Day.memorize();
-        Day.delete();
-        localStorage.setItem('lastCheck', _Date('en-US'));
-        arrangeList(true);
+        const lastSeenDayTaskArrange = userSetting('todayArrange');
+        if (Object.keys(lastSeenDayTaskArrange).length) {
+          determineTaskStatus(Object.values(lastSeenDayTaskArrange), lastSeen, true);
+        } else {
+          Day.memorize();
+          Day.delete();
+          localStorage.setItem('lastSeen', _Date('en-US'));
+          arrangeList(true);
+        }
       }
   }
 }
@@ -1580,11 +1668,11 @@ function sortTasks(task1, task2) {
     task2Subject = task2.querySelector('p').innerText;
   } else {
     task1Pin = task1.pin;
-    task1Order = 0;
-    task1Subject = task1.subject;
+    task1Order = typeof task1.order === 'number' ? task1.order : 0;
+    task1Subject = task1?.rootObject?.subject || task1.subject;
     task2Pin = task2.pin;
-    task2Order = 0;
-    task2Subject = task2.subject;
+    task2Order = typeof task2.order === 'number' ? task2.order : 0;
+    task2Subject = task2?.rootObject?.subject || task2.subject;
   }
   switch (true) {
     // Sort by pin value
